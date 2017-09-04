@@ -17,6 +17,19 @@ float max_value=0.0f;
 
 float data_array2D[600][248], norm_data_array2D[600][248];
 
+struct GridPoint{
+    float coord_x, coord_y;
+    float scalar_value;
+};
+
+struct LineSegment {
+    GridPoint point1, point2;
+};
+
+struct SaddleSegments {
+    LineSegment segment_a, segment_b;
+};
+
 void renderColorMap(){
 
     glClear(GL_COLOR_BUFFER_BIT| GL_DEPTH_BUFFER_BIT);
@@ -55,7 +68,7 @@ void renderHeightMap(){
     glClear(GL_COLOR_BUFFER_BIT| GL_DEPTH_BUFFER_BIT);
 
     glLoadIdentity();
-    gluLookAt(-0.1,0.5, 0.5,  /* eye is at (0,0,5) */
+    gluLookAt(-0.1,0.5, 0.5,  /* eye is at (-0.1,0.5, 0.5) */
     0.0, 0.0, 0.0,      /* center is at (0,0,0) */
     0.0, 1.0, 0.);
 
@@ -96,6 +109,95 @@ void renderHeightMap(){
 }
 
 void renderContourMap(){
+
+    glClearColor(0.0f, 0.0f,0.0f, 0.1f);
+    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+    glLoadIdentity();
+    glBegin(GL_QUADS);
+
+    for(int y=0;y<(248-1);y++){
+        for(int x=0;x<(600-1);x++){
+            //for vertex (x,y)
+            glColor3f(norm_data_array2D[x][y],0.0f,0.0f);
+            glVertex2f(-0.9f+x*0.003,-0.375f+y*0.003);
+
+            //for vertex (x+1,y)
+            glColor3f(norm_data_array2D[x+1][y],0.0f,0.0f);
+            glVertex2f(-0.9f+(x+1)*0.003,-0.375f+y*0.003);
+
+            //for vertex (x+1,y+1)
+            glColor3f(norm_data_array2D[x+1][y+1],0.0f,0.0f);
+            glVertex2f(-0.9f+(x+1)*0.003,-0.375f+(y+1)*0.003);
+
+            //for vertex (x,y+1)
+            glColor3f(norm_data_array2D[x][y+1],0.0f,0.0f);
+            glVertex2f(-0.9f+x*0.003,-0.375f+(y+1)*0.003);
+
+        }
+    }
+
+    glEnd();
+
+
+    GridPoint gp_array[4];
+    LineSegment ls;
+    SaddleSegments ss;
+
+
+    int case_num =0;
+    float cut_off[10] = {5.0f, 20.0f,50.0f,100.0f, 500.0f, 1000.0f, 2000.f, 3000.0f, 4000.0f, 4500.0f};
+
+
+    glBegin(GL_LINES);
+
+    glColor3f(1.0f,1.0f,0.0f);
+    for(int contour_index = 0; contour_index <10 ; contour_index++){
+        for(int y=0;y<(248-1);y++){
+            for(int x=0;x<(600-1);x++){
+
+                gp_array[0].coord_x=x;
+                gp_array[0].coord_y=y;
+                gp_array[0].scalar_value=data_array2D[x][y];
+
+                gp_array[1].coord_x=(x+1);
+                gp_array[1].coord_y=y;
+                gp_array[1].scalar_value=data_array2D[(x+1)][y];
+
+                gp_array[2].coord_x=(x+1);
+                gp_array[2].coord_y=(y+1);
+                gp_array[2].scalar_value=data_array2D[(x+1)][(y+1)];
+
+                gp_array[3].coord_x=x;
+                gp_array[3].coord_y=(y+1);
+                gp_array[3].scalar_value=data_array2D[x][(y+1)];
+
+                case_num = getCaseNumberByGridPointsCutoff(cut_off[contour_index], gp_array);
+
+
+                if(case_num!=0 && case_num!=15){
+                    if(case_num!=5 && case_num!=10){
+
+                        ls = getLineSegmentByCase(case_num, gp_array);
+                        glVertex2f(-0.9f+(ls.point1.coord_x)*0.003,-0.375f+(ls.point1.coord_y)*0.003);
+                        glVertex2f(-0.9f+(ls.point2.coord_x)*0.003,-0.375f+(ls.point2.coord_y)*0.003);
+
+                    }else{
+                            ss = getSaddleSegments(case_num, gp_array);
+                            glVertex2f(-0.9f+(ss.segment_a.point1.coord_x)*0.003,-0.375f+(ss.segment_a.point1.coord_y)*0.003);
+                            glVertex2f(-0.9f+(ss.segment_a.point2.coord_x)*0.003,-0.375f+(ss.segment_a.point2.coord_y)*0.003);
+
+                            glVertex2f(-0.9f+(ss.segment_b.point1.coord_x)*0.003,-0.375f+(ss.segment_b.point1.coord_y)*0.003);
+                            glVertex2f(-0.9f+(ss.segment_b.point2.coord_x)*0.003,-0.375f+(ss.segment_b.point2.coord_y)*0.003);
+                        }
+
+                }
+
+            }
+        }
+    }
+
+    glEnd();
+
 }
 
 int extractScalarbyZ(int scalar_index, int z_value){
@@ -157,65 +259,11 @@ int normalize_data(float min_val, float max_val){
     return result;
 }
 
-
-void display(){
-
-    glClear(GL_COLOR_BUFFER_BIT| GL_DEPTH_BUFFER_BIT);
-
-    glLoadIdentity();
-    gluLookAt(-0.1,0.5, 0.5,  /* eye is at (0,0,5) */
-    0.0, 0.0, 0.0,      /* center is at (0,0,0) */
-    0.0, 1.0, 0.);
-
-    glRotatef( counter , 1.0, 1.0 , 1.0 );
-    counter+=0.005;
-    if(counter>=1)counter=-1;
-
-
-        glBegin(GL_TRIANGLE_STRIP);
-
-        for(int x=0;x<(600-1);x++){
-        for(int y=0;y<(248-1);y++){
-
-
-
-
-                //for vertex (x,y)
-                glColor3f(0.0f,0.0f,norm_data_array2D[x][y]);
-                glVertex3f(x*0.001,norm_data_array2D[x][y],y*0.001);
-//glVertex3f(x*0.001,y*0.001,norm_data_array2D[x][y]);
-
-                //for vertex (x+1,y)
-                glColor3f(0.0f,0.0f,norm_data_array2D[(x+1)][y]);
-                glVertex3f((x+1)*0.001,norm_data_array2D[(x+1)][y],y*0.001);
-//glVertex3f((x+1)*0.001,y*0.001,norm_data_array2D[(x+1)][y]);
-
-
-                //for vertex (x,y+1)
-                glColor3f(0.0f,0.0f,norm_data_array2D[x][(y+1)]);
-                glVertex3f(x*0.001,norm_data_array2D[x][(y+1)],(y+1)*0.001);
-//glVertex3f(x*0.001,(y+1)*0.001,norm_data_array2D[x][(y+1)]);
-                //for vertex (x+1,y+1)
-                glColor3f(0.0f,0.0f,norm_data_array2D[(x+1)][(y+1)]);
-                glVertex3f((x+1)*0.001,norm_data_array2D[(x+1)][(y+1)],(y+1)*0.001);
-//glVertex3f((x+1)*0.001,(y+1)*0.001,norm_data_array2D[(x+1)][(y+1)]);
-
-            }
-        }
-
-        glEnd();
-
-
-
-    glutSwapBuffers();
-}
-
 void reshape(int w, int h){
 
     glViewport(0,0,w,h);
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    //gluPerspective( 60, float(w)/float(h),1,10);
     glOrtho(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0);
     glMatrixMode(GL_MODELVIEW);
 
