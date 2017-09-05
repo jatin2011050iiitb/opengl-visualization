@@ -16,8 +16,6 @@ string scalar_file_name;
 float min_value=0.0f;
 float max_value=0.0f;
 typedef float VECTOR[3];
-VECTOR vec_data[600][248];
-VECTOR vel[600][248][248];
 float curl_mag[600][248][248];
 
 float data_array2D[600][248], norm_data_array2D[600][248];
@@ -34,155 +32,6 @@ struct LineSegment {
 struct SaddleSegments {
     LineSegment segment_a, segment_b;
 };
-
-SaddleSegments getSaddleSegments(int case_number, GridPoint *gp_array ){
-    SaddleSegments segments;
-
-    switch (case_number) {
-        case 5: segments.segment_a.point1.coord_x = (gp_array[3].coord_x + gp_array[2].coord_x)/2;
-                segments.segment_a.point1.coord_y = (gp_array[3].coord_y + gp_array[2].coord_y)/2;
-
-                segments.segment_a.point2.coord_x = (gp_array[3].coord_x + gp_array[0].coord_x)/2;
-                segments.segment_a.point2.coord_y = (gp_array[3].coord_y + gp_array[0].coord_y)/2;
-
-                segments.segment_b.point1.coord_x = (gp_array[1].coord_x + gp_array[2].coord_x)/2;
-                segments.segment_b.point1.coord_y = (gp_array[1].coord_y + gp_array[2].coord_y)/2;
-
-                segments.segment_b.point2.coord_x = (gp_array[1].coord_x + gp_array[0].coord_x)/2;
-                segments.segment_b.point2.coord_y = (gp_array[1].coord_y + gp_array[0].coord_y)/2;
-
-            break;
-        case 10:segments.segment_a.point1.coord_x = (gp_array[3].coord_x + gp_array[2].coord_x)/2;
-                segments.segment_a.point1.coord_y = (gp_array[3].coord_y + gp_array[2].coord_y)/2;
-
-                segments.segment_a.point2.coord_x = (gp_array[2].coord_x + gp_array[1].coord_x)/2;
-                segments.segment_a.point2.coord_y = (gp_array[2].coord_y + gp_array[1].coord_y)/2;
-
-                segments.segment_b.point1.coord_x = (gp_array[3].coord_x + gp_array[0].coord_x)/2;
-                segments.segment_b.point1.coord_y = (gp_array[3].coord_y + gp_array[0].coord_y)/2;
-
-                segments.segment_b.point2.coord_x = (gp_array[1].coord_x + gp_array[0].coord_x)/2;
-                segments.segment_b.point2.coord_y = (gp_array[1].coord_y + gp_array[0].coord_y)/2;
-
-            break;
-
-                break;
-        default:
-                break;
-    }
-
-    return segments;
-}
-
-LineSegment getLineSegmentByCase(int case_number, GridPoint *gp_array ){
-
-    LineSegment a;
-
-    switch (case_number) {
-        //case 0:
-        case 1: a.point1.coord_x = (gp_array[3].coord_x + gp_array[0].coord_x)/2;
-                a.point1.coord_y = (gp_array[3].coord_y + gp_array[0].coord_y)/2;
-
-                a.point2.coord_x = (gp_array[1].coord_x + gp_array[0].coord_x)/2;
-                a.point2.coord_y = (gp_array[1].coord_y + gp_array[0].coord_y)/2;
-                break;
-
-        case 2: a.point1.coord_x = (gp_array[1].coord_x + gp_array[2].coord_x)/2;
-                a.point1.coord_y = (gp_array[1].coord_y + gp_array[2].coord_y)/2;
-
-                a.point2.coord_x = (gp_array[1].coord_x + gp_array[0].coord_x)/2;
-                a.point2.coord_y = (gp_array[1].coord_y + gp_array[0].coord_y)/2;
-                break;
-        case 3: a.point1.coord_x = (gp_array[0].coord_x + gp_array[3].coord_x)/2;
-                a.point1.coord_y = (gp_array[0].coord_y + gp_array[3].coord_y)/2;
-
-                a.point2.coord_x = (gp_array[1].coord_x + gp_array[2].coord_x)/2;
-                a.point2.coord_y = (gp_array[1].coord_y + gp_array[2].coord_y)/2;
-                break;
-
-        case 4: a.point1.coord_x = (gp_array[1].coord_x + gp_array[2].coord_x)/2;
-                a.point1.coord_y = (gp_array[1].coord_y + gp_array[2].coord_y)/2;
-
-                a.point2.coord_x = (gp_array[2].coord_x + gp_array[1].coord_x)/2;
-                a.point2.coord_y = (gp_array[2].coord_y + gp_array[1].coord_y)/2;
-
-                break;
-
-        case 6: a.point1.coord_x = (gp_array[3].coord_x + gp_array[2].coord_x)/2;
-                a.point1.coord_y = (gp_array[3].coord_y + gp_array[2].coord_y)/2;
-
-                a.point2.coord_x = (gp_array[1].coord_x + gp_array[0].coord_x)/2;
-                a.point2.coord_y = (gp_array[1].coord_y + gp_array[0].coord_y)/2;
-
-                break;
-        case 7: a.point1.coord_x = (gp_array[3].coord_x + gp_array[2].coord_x)/2;
-                a.point1.coord_y = (gp_array[3].coord_y + gp_array[2].coord_y)/2;
-
-                a.point2.coord_x = (gp_array[3].coord_x + gp_array[0].coord_x)/2;
-                a.point2.coord_y = (gp_array[3].coord_y + gp_array[0].coord_y)/2;
-
-                break;
-        case 8: a.point1.coord_x = (gp_array[3].coord_x + gp_array[2].coord_x)/2;
-                a.point1.coord_y = (gp_array[3].coord_y + gp_array[2].coord_y)/2;
-
-                a.point2.coord_x = (gp_array[3].coord_x + gp_array[0].coord_x)/2;
-                a.point2.coord_y = (gp_array[3].coord_y + gp_array[0].coord_y)/2;
-
-                break;
-        case 9: a.point1.coord_x = (gp_array[3].coord_x + gp_array[2].coord_x)/2;
-                a.point1.coord_y = (gp_array[3].coord_y + gp_array[2].coord_y)/2;
-
-                a.point2.coord_x = (gp_array[1].coord_x + gp_array[0].coord_x)/2;
-                a.point2.coord_y = (gp_array[1].coord_y + gp_array[0].coord_y)/2;
-
-                break;
-        case 11:a.point1.coord_x = (gp_array[1].coord_x + gp_array[2].coord_x)/2;
-                a.point1.coord_y = (gp_array[1].coord_y + gp_array[2].coord_y)/2;
-
-                a.point2.coord_x = (gp_array[2].coord_x + gp_array[1].coord_x)/2;
-                a.point2.coord_y = (gp_array[2].coord_y + gp_array[1].coord_y)/2;
-
-                break;
-        case 12:a.point1.coord_x = (gp_array[0].coord_x + gp_array[3].coord_x)/2;
-                a.point1.coord_y = (gp_array[0].coord_y + gp_array[3].coord_y)/2;
-
-                a.point2.coord_x = (gp_array[1].coord_x + gp_array[2].coord_x)/2;
-                a.point2.coord_y = (gp_array[1].coord_y + gp_array[2].coord_y)/2;
-
-                break;
-        case 13:a.point1.coord_x = (gp_array[1].coord_x + gp_array[2].coord_x)/2;
-                a.point1.coord_y = (gp_array[1].coord_y + gp_array[2].coord_y)/2;
-
-                a.point2.coord_x = (gp_array[1].coord_x + gp_array[0].coord_x)/2;
-                a.point2.coord_y = (gp_array[1].coord_y + gp_array[0].coord_y)/2;
-                break;
-        case 14:a.point1.coord_x = (gp_array[3].coord_x + gp_array[0].coord_x)/2;
-                a.point1.coord_y = (gp_array[3].coord_y + gp_array[0].coord_y)/2;
-
-                a.point2.coord_x = (gp_array[1].coord_x + gp_array[0].coord_x)/2;
-                a.point2.coord_y = (gp_array[1].coord_y + gp_array[0].coord_y)/2;
-                break;
-        //case 15:break;
-
-        default:
-            break;
-    }
-
-    return a;
-}
-
-int getCaseNumberByGridPointsCutoff(float cutoff, GridPoint *gp_array){
-
-    int caseNumber = 0;
-
-    if(gp_array[3].scalar_value>=cutoff) {caseNumber = caseNumber | 8;}
-    if(gp_array[2].scalar_value>=cutoff) {caseNumber = caseNumber | 4;}
-    if(gp_array[1].scalar_value>=cutoff) {caseNumber = caseNumber | 2;}
-    if(gp_array[0].scalar_value>=cutoff) {caseNumber = caseNumber | 1;}
-
-    return caseNumber;
-
-}
 
 void renderColorMap(){
 
@@ -409,13 +258,10 @@ int extractScalarbyZ(int scalar_index, int z_value){
 return result;
 }
 
-float getVectorMagnitude(VECTOR a){
-    return sqrt(a[0]*a[0]+a[1]*a[1]+a[2]*a[2]);
-}
-
-int extractVectorbyZ(int z_value){
+int extractMagOfCurl(){
 
     int result = 0;
+
     ifstream fin(input_file_name.c_str());
     if(fin==NULL){
         cout<<"Could not open " << input_file_name << " for reading";
@@ -423,81 +269,21 @@ int extractVectorbyZ(int z_value){
     }
 
     VECTOR row;
-    float vec_magnitude;
-
-    unsigned x,y;
-    for(int z=0;z<248;z++){
+    VECTOR vel[600][248][248];
+    unsigned x,y,z;
+    for(z=0;z<248;z++){
         for(y=0;y<248;y++){
             for(x=0;x<600;x++){
                 fin >> row[0] >> row[1] >> row[2];
-                 if(z==z_value){
-                    vec_magnitude = getVectorMagnitude(row);
-                    if(x==0 && y==0){
-                        min_value = vec_magnitude;
-                        max_value = vec_magnitude;
-                    }
-
-                    if(vec_magnitude < min_value){
-                        min_value = vec_magnitude;
-                    }
-                    if(vec_magnitude > max_value){
-                        max_value = vec_magnitude;
-                    }
-
-                    vec_data[x][y][0]=row[0];vec_data[x][y][1]=row[1];vec_data[x][y][2]=row[2];
-
-                 }
-
-
-            }
-        }
-
-        if(z==z_value)break;
-
-    }
-    fin.close();
-
-    result = 1;
-
-    return result;
-}
-
-int extractMagOfCurl(){
-
-    cout<<"reading file beginning"<<endl;
-    int result = 0;
-
-    ifstream fin(input_file_name.c_str());
-    if(fin==NULL){
-        cout<<"Could not open " << input_file_name << " for reading";
-        return -2;
-    }else{
-        cout<<"Able to Open file: "<< input_file_name.c_str();
-    }
-
-    VECTOR row;
-    float r0,r1,r2;
-    unsigned x,y,z;
-    cout<<"reading file"<<endl;
-    for(z=0;z<248;z++){
-        for(y=0;y<248;y++){
-            for(x=0;x<600;x++){
-                //fin >> row[0] >> row[1] >> row[2];
-                fin >> r0 >> r1 >> r2;
-                // vel[x][y][z][0]=row[0];
-                // vel[x][y][z][1]=row[1];
-                // vel[x][y][z][2]=row[2];
-                 vel[x][y][z][0]=r0;
-                 vel[x][y][z][1]=r1;
-                 vel[x][y][z][2]=r2;
+                 vel[x][y][z]=row;
             }
         }
 
     }
     fin.close();
 
-    cout<<"Calculating curl"<<endl;
-    for(z=0;z<248;z++){
+    //calculating curl
+
     for(y=0;y<248;y++){
         for(x=0;x<600;x++){
             if((x==599) || (y==247)||(z==247)){
@@ -512,7 +298,7 @@ int extractMagOfCurl(){
 
         }
     }
-    }
+
     result = 1;
 
     return result;
@@ -594,7 +380,7 @@ int main(int argc, char **argv){
     if(scalarName=="curl"){
         scalar_index=10;
     }
-    if(scalarName=="vectorfield"){
+    if(scalarName="vectorfield"){
         scalar_index = 15;
     }
 
@@ -602,8 +388,11 @@ int main(int argc, char **argv){
 
     cout<<endl<<input_file_name<<" " << map_type << " " << scalarName<<endl;
     int extract_done =0;
+    if(extract_done!=1){
 
+    }
 
+    normalize_data(min_value, max_value);
 
     glutInit(&argc,argv);
     glutInitDisplayMode(GLUT_DOUBLE|GLUT_RGBA|GLUT_DEPTH);
@@ -616,7 +405,6 @@ int main(int argc, char **argv){
 
     case 0: extract_done = extractScalarbyZ(scalar_index,0);
             if(extract_done==1){
-                normalize_data(min_value, max_value);
                 if(map_type=="colormap"){
                     cout<<"\nGenerating ColorMap for Density"<<endl;
                     glutDisplayFunc(renderColorMap);
@@ -636,7 +424,6 @@ int main(int argc, char **argv){
             break;
 
     case 1: extract_done = extractScalarbyZ(scalar_index,0);
-            normalize_data(min_value, max_value);
             if(extract_done==1){
                 if(map_type=="colormap"){
                     cout<<"\nGenerating ColorMap for Temperature"<<endl;
@@ -658,7 +445,6 @@ int main(int argc, char **argv){
 
     case 10:if(extractMagOfCurl()==1){
                 extract_done = subsetCurlMag(0);
-                normalize_data(min_value, max_value);
             }
 
             if(extract_done==1){
@@ -698,10 +484,10 @@ int main(int argc, char **argv){
             break;
 
     default:    cout<<"Invalid MapType or Scalar/Vector Field Name."<<endl;
-                cout<<"Valid Scalar Fields are:   density,    pressure    & curl"<<endl;
-                cout<<"Valid Scalar field Maps are:  colormap,   heightmap   & contourmap"<<endl;
-                cout<<"Valid Vector Fields are:   velocity"<<endl;
-                cout<<"Valid Vector Fields MapType are:        hedgehog    & streamlines"<<endl;
+                cout<<"Valid Values Scalar Fields are:   Density,    Pressure    & Curl"<<endl;
+                cout<<"Valid Values Scalar field Maps are:  ColorMap,   HeightMap   & ContourMap"<<endl;
+                cout<<"Valid Values Vector Fields are:   Velocity"<<endl;
+                cout<<"Valid Values MapType are:        HedgeHog    & StreamLines"<<endl;
                 break;
     }
 
