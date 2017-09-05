@@ -5,6 +5,7 @@
 #include <iostream>
 #include <string.h>
 #include <iomanip>
+#include <math.h>
 
 
 using namespace std;
@@ -14,6 +15,8 @@ string input_file_name;
 string scalar_file_name;
 float min_value=0.0f;
 float max_value=0.0f;
+typedef float VECTOR[3];
+float curl_mag[600][248][248];
 
 float data_array2D[600][248], norm_data_array2D[600][248];
 
@@ -200,6 +203,13 @@ void renderContourMap(){
 
 }
 
+void renderHedgeHog(){
+
+
+}
+
+void renderStreamLines(){
+}
 int extractScalarbyZ(int scalar_index, int z_value){
 
     int result = 0;
@@ -213,6 +223,7 @@ int extractScalarbyZ(int scalar_index, int z_value){
 
     if(scalar_index<0 || scalar_index>9){
         cout<<"Invalid scalar_index for multifield file. Valid Values :  0<= scalar_index <=9 .";
+        return -1;
     }
 
     if(z_value<0 || z_value>247){
@@ -241,9 +252,83 @@ int extractScalarbyZ(int scalar_index, int z_value){
         if(z==z_value)break;
     }
 
+    result = 1;
     fin.close();
 
 return result;
+}
+
+int extractMagOfCurl(){
+
+    int result = 0;
+
+    ifstream fin(input_file_name.c_str());
+    if(fin==NULL){
+        cout<<"Could not open " << input_file_name << " for reading";
+        return -2;
+    }
+
+    VECTOR row;
+    VECTOR vel[600][248][248];
+    unsigned x,y,z;
+    for(z=0;z<248;z++){
+        for(y=0;y<248;y++){
+            for(x=0;x<600;x++){
+                fin >> row[0] >> row[1] >> row[2];
+                 vel[x][y][z]=row;
+            }
+        }
+
+    }
+    fin.close();
+
+    //calculating curl
+
+    for(y=0;y<248;y++){
+        for(x=0;x<600;x++){
+            if((x==599) || (y==247)||(z==247)){
+                curl_mag[x][y][z]=0.0;
+            }else{
+                VECTOR curl;
+                curl[0] = (vel[x][y+1][z][2]-vel[x][y][z][2]-vel[x][y][z+1][1]+vel[x][y][z][1])/0.001;
+                curl[1] = (vel[x][y][z+1][0]-vel[x][y][z][0]-vel[x+1][y][z][2]+vel[x][y][z][2])/0.001;
+                curl[2] = (vel[x+1][y][z][1]-vel[x][y][z][1]-vel[x][y+1][z][0]+vel[x][y][z][0])/0.001;
+                curl_mag[x][y][z]= sqrt(curl[0]*curl[0]+curl[1]*curl[1]+curl[2]*curl[2]);
+            }
+
+        }
+    }
+
+    result = 1;
+
+    return result;
+}
+
+int subsetCurlMag(int z_value){
+
+    for(int z=0;z<248;z++){
+        for(int y=0;y<248;y++){
+            for(int x=0;x<600;x++){
+                if(z==z_value){
+                    if(x==0 && y==0 ){
+                        max_value = curl_mag[x][y][z];
+                        min_value = curl_mag[x][y][z];
+                    }
+                    if(curl_mag[x][y][z] > max_value ){
+                        max_value = curl_mag[x][y][z];
+                    }
+                    if(curl_mag[x][y][z] < min_value ){
+                        min_value = curl_mag[x][y][z];
+                    }
+                    data_array2D[x][y]=curl_mag[x][y][z];
+                }
+            }
+        }
+        if(z==z_value)break;
+    }
+
+    return 1;
+
 }
 
 int normalize_data(float min_val, float max_val){
@@ -295,11 +380,18 @@ int main(int argc, char **argv){
     if(scalarName=="curl"){
         scalar_index=10;
     }
+    if(scalarName="vectorfield"){
+        scalar_index = 15;
+    }
 
     string map_type = argv[3];
 
     cout<<endl<<input_file_name<<" " << map_type << " " << scalarName<<endl;
-    int extract_done = extractScalarbyZ(scalar_index,0);
+    int extract_done =0;
+    if(extract_done!=1){
+
+    }
+
     normalize_data(min_value, max_value);
 
     glutInit(&argc,argv);
@@ -311,7 +403,8 @@ int main(int argc, char **argv){
 
     switch(scalar_index){
 
-    case 0: if(extract_done==0){
+    case 0: extract_done = extractScalarbyZ(scalar_index,0);
+            if(extract_done==1){
                 if(map_type=="colormap"){
                     cout<<"\nGenerating ColorMap for Density"<<endl;
                     glutDisplayFunc(renderColorMap);
@@ -330,7 +423,8 @@ int main(int argc, char **argv){
             }
             break;
 
-    case 1:  if(extract_done==0){
+    case 1: extract_done = extractScalarbyZ(scalar_index,0);
+            if(extract_done==1){
                 if(map_type=="colormap"){
                     cout<<"\nGenerating ColorMap for Temperature"<<endl;
                     glutDisplayFunc(renderColorMap);
@@ -349,18 +443,51 @@ int main(int argc, char **argv){
             }
             break;
 
-    case 10: if(extractScalarbyZ(scalar_index,0)==0){
-                if(map_type=="colormap"){    renderColorMap();   }
-                if(map_type=="heightmap"){   renderHeightMap();  }
-                if(map_type=="contourmap"){  renderContourMap(); }
+    case 10:if(extractMagOfCurl()==1){
+                extract_done = subsetCurlMag(0);
+            }
+
+            if(extract_done==1){
+                if(map_type=="colormap"){
+                    cout<<"\nGenerating ColorMap for Temperature"<<endl;
+                    glutDisplayFunc(renderColorMap);
+                    glutIdleFunc(renderColorMap);
+                }
+                if(map_type=="heightmap"){
+                    glutDisplayFunc(renderHeightMap);
+                    glutIdleFunc(renderHeightMap);
+                }
+                if(map_type=="contourmap"){
+                    glutDisplayFunc(renderContourMap);
+                    glutIdleFunc(renderContourMap);
+                }
             }else{
                 cout<<"Unable to extract data";
             }
             break;
 
-    default:    cout<<"Invalid MapType or Scalar Name."<<endl;
-                cout<<"Valid Values Scalar Names are:   Density,    Pressure    & Curl"<<endl;
-                cout<<"Valid Values MapType are:        ColorMap,   HeightMap   & ContourMap"<<endl;
+    case 15:extract_done = subsetCurlMag(0);
+
+            if(extract_done==1){
+                if(map_type=="hedgehog"){
+                    cout<<"\nGenerating ColorMap for Temperature"<<endl;
+                    glutDisplayFunc(renderHedgeHog);
+                    glutIdleFunc(renderHedgeHog);
+                }
+                if(map_type=="streamlines"){
+                    glutDisplayFunc(renderStreamLines);
+                    glutIdleFunc(renderStreamLines);
+                }
+            }else{
+                cout<<"Unable to extract data";
+            }
+            break;
+
+    default:    cout<<"Invalid MapType or Scalar/Vector Field Name."<<endl;
+                cout<<"Valid Values Scalar Fields are:   Density,    Pressure    & Curl"<<endl;
+                cout<<"Valid Values Scalar field Maps are:  ColorMap,   HeightMap   & ContourMap"<<endl;
+                cout<<"Valid Values Vector Fields are:   Velocity"<<endl;
+                cout<<"Valid Values MapType are:        HedgeHog    & StreamLines"<<endl;
                 break;
     }
 
@@ -369,3 +496,4 @@ int main(int argc, char **argv){
     glutMainLoop();
     return 0;
 }
+
