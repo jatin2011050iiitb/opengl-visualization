@@ -371,7 +371,7 @@
 
         int result = 0;
         ifstream fin(input_file_name.c_str());
-        if(fin==NULL){
+        if(!fin){
             cout<<"Could not open " << input_file_name << " for reading";
             return -2;
         }
@@ -432,50 +432,70 @@
 
 
         //cout<<"Rendering Lines";
-        glBegin(GL_LINE_STRIP);
+        glBegin(GL_LINES);
 
         float norm_vec_mag = 0.0;
         float vec_length = 0.0;
         float x_c = 0.0f;
         float y_c = 0.0f;
+        float step = 1.0f;
 
-        for(int y=70;y<(180-1);y+=10){
-            for(int x=250;x<360;x+=10  ){
+        for(int y=0;y<248;y+=10){
+            for(int x=0;x<600;x+=10){
                 //for vertex (x,y)
 
                 norm_vec_mag = (vec_mag[x][y]-min_value)/(max_value-min_value);
                 vec_length = sqrt(vec_data[x][y][0]*vec_data[x][y][0]+vec_data[x][y][1]*vec_data[x][y][1]);
                 x_c = (vec_data[x][y][0])/vec_mag[x][y];
                 y_c = (vec_data[x][y][1])/vec_mag[x][y];
-                //norm_vec_mag = vec_mag[x][y];
-                //norm_vec_mag *= 0.001;
 
                 glColor3f(norm_vec_mag,1-norm_vec_mag,0.0f);
-                glVertex2f(-0.9f+(x)*0.003,y*0.003);
-                glVertex2f(-0.9f+(x+x_c*10)*0.003,(y+y_c*10)*0.003);
-                glVertex2f(-0.9f+(x+(vec_length)+x_c*10)*0.003,(y-(vec_length)+y_c*10)*0.003);
-                glVertex2f(-0.9f+(x+(vec_length)+x_c*10)*0.003,(y+(vec_length)+y_c*10)*0.003);
-                glVertex2f(-0.9f+(x-(vec_length)+x_c*10)*0.003,(y+(vec_length)+y_c*10)*0.003);
-                glVertex2f(-0.9f+(x+x_c*10)*0.003,(y+y_c*10)*0.03);
 
+//                glVertex2f(-0.9f+(x+x_c)*0.003,y*0.003);
+//                glVertex2f(-0.9f+(x+vec_data[x][y][0])*0.003,(y+vec_data[x][y][1])*0.003);
+//
+//                glVertex2f(-0.9f+(x+vec_data[x][y][0])*0.003,(y+vec_data[x][y][1])*0.003);
+//                glVertex2f(-0.9f+(x)*0.003,(y+y_c)*0.003);
 
+                glVertex2d(x*step, y*step);
+                glVertex2d((x+vec_data[x][y][0])*step, (y+vec_data[x][y][1])*step);
+//
+//                glVertex2d(-0.9f + (x+(vec_length/10)+0.5)*0.1, (y-(vec_length/10)+0.5)*0.1);
+//                glVertex2d(-0.9f + (x+(vec_length/10)+0.5)*0.1, (y+(vec_length/10)+0.5)*0.1);
+//
+//                glVertex2d(-0.9f + (x+(vec_length/10)+0.5)*0.1, (y+(vec_length/10)+0.5)*0.1);
+//                glVertex2d(-0.9f + (x-(vec_length/10)+0.5)*0.1, (y+(vec_length/10)+0.5)*0.1);
+//
+//                glVertex2d(-0.9f + (x-(vec_length/10)+0.5)*0.1, (y+(vec_length/10)+0.5)*0.1);
+//                glVertex2d(-0.9f + (x+(vec_length/10)+0.5)*0.1, (y-(vec_length/10)+0.5)*0.1);
 
-
-                //for vertex (x+1,y)
-    //            glColor3f(norm_data_array2D[x+1][y],0.0f,0.0f);
-    //            glVertex2f(-0.9f+(x+1)*0.003,-0.375f+y*0.003);
-    //
-    //            //for vertex (x+1,y+1)
-    //            glColor3f(norm_data_array2D[x+1][y+1],0.0f,0.0f);
-    //            glVertex2f(-0.9f+(x+1)*0.003,-0.375f+(y+1)*0.003);
-    //
-    //            //for vertex (x,y+1)
-    //            glColor3f(norm_data_array2D[x][y+1],0.0f,0.0f);
-    //            glVertex2f(-0.9f+x*0.003,-0.375f+(y+1)*0.003);
 
             }
         }
 
+//        vec_length = sqrt(0.5f);
+//        for(int x = 0; x<6; x++ ){
+//            for(int y=0; y<3; y++){
+//
+//                glColor3f(0.0f, 0.5f, 0.5f);
+//
+//
+//                glVertex2d(-0.9f + x*0.1, y*0.1);
+//                glVertex2d(-0.9f + (x+0.5)*0.1, (y+0.5)*0.1);
+//
+//                glVertex2d(-0.9f + (x+(vec_length/10)+0.5)*0.1, (y-(vec_length/10)+0.5)*0.1);
+//                glVertex2d(-0.9f + (x+(vec_length/10)+0.5)*0.1, (y+(vec_length/10)+0.5)*0.1);
+//
+//                glVertex2d(-0.9f + (x+(vec_length/10)+0.5)*0.1, (y+(vec_length/10)+0.5)*0.1);
+//                glVertex2d(-0.9f + (x-(vec_length/10)+0.5)*0.1, (y+(vec_length/10)+0.5)*0.1);
+//
+//                glVertex2d(-0.9f + (x-(vec_length/10)+0.5)*0.1, (y+(vec_length/10)+0.5)*0.1);
+//                glVertex2d(-0.9f + (x+(vec_length/10)+0.5)*0.1, (y-(vec_length/10)+0.5)*0.1);
+//
+//
+//            }
+//        }
+//
         glEnd();
         glutSwapBuffers();
 
@@ -489,7 +509,7 @@
         float scalar[10];
         ifstream fin(input_file_name.c_str());
 
-        if(fin==NULL){
+        if(!fin){
             cout<<"Could not open " << input_file_name << " for reading";
             return -2;
         }
@@ -538,7 +558,7 @@
 
         int result = 0;
         ifstream fin(input_file_name.c_str());
-        if(fin==NULL){
+        if(!fin){
             cout<<"Could not open " << input_file_name << " for reading";
             return -2;
         }else{
@@ -632,7 +652,8 @@
         glViewport(0,0,w,h);
         glMatrixMode(GL_PROJECTION);
         glLoadIdentity();
-        glOrtho(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0);
+        //glOrtho(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0);
+        glOrtho(-700.0, 700.0, -300.0, 300.0, -300.0, 300.0);
         glMatrixMode(GL_MODELVIEW);
 
     }
@@ -788,5 +809,4 @@
         glutMainLoop();
         return 0;
     }
-
 
