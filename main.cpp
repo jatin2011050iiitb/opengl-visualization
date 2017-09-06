@@ -20,7 +20,7 @@ VECTOR vec_data[600][248];
 float vec_mag[600][248];
 VECTOR vel[600][248][248];
 float curl_mag[600][248][248];
-
+int first = 0;
 float data_array2D[600][248], norm_data_array2D[600][248];
 
 struct GridPoint{
@@ -268,6 +268,8 @@ void renderContourMap(){
     glClearColor(0.0f, 0.0f,0.0f, 0.1f);
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
     glLoadIdentity();
+
+    cout<<"Rendering Quads";
     glBegin(GL_QUADS);
 
     for(int y=0;y<(248-1);y++){
@@ -294,19 +296,21 @@ void renderContourMap(){
     glEnd();
 
 
+
     GridPoint gp_array[4];
     LineSegment ls;
     SaddleSegments ss;
 
 
     int case_num =0;
-    float cut_off[10] = {5.0f, 20.0f,50.0f,100.0f, 500.0f, 1000.0f, 2000.f, 3000.0f, 4000.0f, 4500.0f};
+    float cut_off[10] = {500.0f, 1000.0f, 2000.f, 3000.0f, 4000.0f};
 
-
+    cout<<"rendering lines";
     glBegin(GL_LINES);
 
     glColor3f(1.0f,1.0f,0.0f);
-    for(int contour_index = 0; contour_index <10 ; contour_index++){
+
+    for(int contour_index = 0; contour_index <5 ; contour_index++){
         for(int y=0;y<(248-1);y++){
             for(int x=0;x<(600-1);x++){
 
@@ -327,7 +331,9 @@ void renderContourMap(){
                 gp_array[3].scalar_value=data_array2D[x][(y+1)];
 
                 case_num = getCaseNumberByGridPointsCutoff(cut_off[contour_index], gp_array);
-
+                if(first==0){
+                    cout<<"Case:" <<case_num<<endl;
+                }
 
                 if(case_num!=0 && case_num!=15){
                     if(case_num!=5 && case_num!=10){
@@ -351,7 +357,10 @@ void renderContourMap(){
         }
     }
 
+    if(first==0)first++;
     glEnd();
+
+    glutSwapBuffers();
 
 }
 
