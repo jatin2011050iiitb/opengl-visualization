@@ -17,6 +17,7 @@ float min_value=0.0f;
 float max_value=0.0f;
 typedef float VECTOR[3];
 VECTOR vec_data[600][248];
+float vec_mag[600][248];
 VECTOR vel[600][248][248];
 float curl_mag[600][248][248];
 
@@ -409,8 +410,8 @@ int extractScalarbyZ(int scalar_index, int z_value){
 return result;
 }
 
-float getVectorMagnitude(VECTOR a){
-    return sqrt(a[0]*a[0]+a[1]*a[1]+a[2]*a[2]);
+float getVectorMagnitude(float  fi, float fj, float fk){
+    return sqrt(fi*fi+fj*fj+fk*fk);
 }
 
 int extractVectorbyZ(int z_value){
@@ -422,16 +423,15 @@ int extractVectorbyZ(int z_value){
         return -2;
     }
 
-    VECTOR row;
     float vec_magnitude;
-
+    float r0, r1, r2;
     unsigned x,y;
     for(int z=0;z<248;z++){
         for(y=0;y<248;y++){
             for(x=0;x<600;x++){
-                fin >> row[0] >> row[1] >> row[2];
+                fin >> r0 >> r1 >>r2;
                  if(z==z_value){
-                    vec_magnitude = getVectorMagnitude(row);
+                    vec_magnitude = getVectorMagnitude(r0,r1,r2);
                     if(x==0 && y==0){
                         min_value = vec_magnitude;
                         max_value = vec_magnitude;
@@ -444,8 +444,8 @@ int extractVectorbyZ(int z_value){
                         max_value = vec_magnitude;
                     }
 
-                    vec_data[x][y][0]=row[0];vec_data[x][y][1]=row[1];vec_data[x][y][2]=row[2];
-
+                    vec_data[x][y][0]=r0;vec_data[x][y][1]=r1;vec_data[x][y][2]=r2;
+                    vec_mag[x][y] = vec_magnitude;
                  }
 
 
@@ -464,9 +464,7 @@ int extractVectorbyZ(int z_value){
 
 int extractMagOfCurl(){
 
-    cout<<"reading file beginning"<<endl;
     int result = 0;
-
     ifstream fin(input_file_name.c_str());
     if(fin==NULL){
         cout<<"Could not open " << input_file_name << " for reading";
@@ -475,18 +473,14 @@ int extractMagOfCurl(){
         cout<<"Able to Open file: "<< input_file_name.c_str();
     }
 
-    VECTOR row;
+
     float r0,r1,r2;
     unsigned x,y,z;
     cout<<"reading file"<<endl;
     for(z=0;z<248;z++){
         for(y=0;y<248;y++){
             for(x=0;x<600;x++){
-                //fin >> row[0] >> row[1] >> row[2];
                 fin >> r0 >> r1 >> r2;
-                // vel[x][y][z][0]=row[0];
-                // vel[x][y][z][1]=row[1];
-                // vel[x][y][z][2]=row[2];
                  vel[x][y][z][0]=r0;
                  vel[x][y][z][1]=r1;
                  vel[x][y][z][2]=r2;
@@ -513,9 +507,12 @@ int extractMagOfCurl(){
         }
     }
     }
+
+    cout<<"Compeleted calculating Curl";
     result = 1;
 
     return result;
+
 }
 
 int subsetCurlMag(int z_value){
@@ -600,7 +597,7 @@ int main(int argc, char **argv){
 
     string map_type = argv[3];
 
-    cout<<endl<<input_file_name<<" " << map_type << " " << scalarName<<endl;
+    cout<<endl<<input_file_name<<" " << scalarName<< " " << map_type <<endl;
     int extract_done =0;
 
 
@@ -615,6 +612,10 @@ int main(int argc, char **argv){
     switch(scalar_index){
 
     case 0: extract_done = extractScalarbyZ(scalar_index,0);
+            cout<<"Extract Completed. Normalization started"<<endl;
+            normalize_data(min_value, max_value);
+            cout<<"Normalization complete"<<endl;
+
             if(extract_done==1){
                 normalize_data(min_value, max_value);
                 if(map_type=="colormap"){
@@ -636,7 +637,9 @@ int main(int argc, char **argv){
             break;
 
     case 1: extract_done = extractScalarbyZ(scalar_index,0);
+            cout<<"Extract Completed. Normalization started"<<endl;
             normalize_data(min_value, max_value);
+            cout<<"Normalization complete"<<endl;
             if(extract_done==1){
                 if(map_type=="colormap"){
                     cout<<"\nGenerating ColorMap for Temperature"<<endl;
@@ -663,7 +666,7 @@ int main(int argc, char **argv){
 
             if(extract_done==1){
                 if(map_type=="colormap"){
-                    cout<<"\nGenerating ColorMap for Temperature"<<endl;
+                    cout<<"\nGenerating ColorMap for Curl magnitude"<<endl;
                     glutDisplayFunc(renderColorMap);
                     glutIdleFunc(renderColorMap);
                 }
@@ -680,8 +683,8 @@ int main(int argc, char **argv){
             }
             break;
 
-    case 15:extract_done = subsetCurlMag(0);
-
+    case 15:
+            extract_done = 0;
             if(extract_done==1){
                 if(map_type=="hedgehog"){
                     cout<<"\nGenerating ColorMap for Temperature"<<endl;
