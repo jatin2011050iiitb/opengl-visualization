@@ -17,7 +17,7 @@
     float min_value=0.0f;
     float max_value=0.0f;
     typedef float VECTOR[3];
-    VECTOR vec_data[600][248];
+    VECTOR vec_data[600][248][248];
     float vec_mag[600][248];
     VECTOR vel[600][248][248];
     float curl_mag[600][248][248];
@@ -367,6 +367,54 @@
     float getVectorMagnitude(float  fi, float fj, float fk){
         return sqrt(fi*fi+fj*fj+fk*fk);
     }
+
+ int extractVectorData(){
+
+        int result = 0;
+        ifstream fin(input_file_name.c_str());
+        if(!fin){
+            cout<<"Could not open " << input_file_name << " for reading";
+            return -2;
+        }
+
+        float vec_magnitude;
+        float r0, r1, r2;
+        unsigned x,y;
+        for(int z=0;z<248;z++){
+            for(y=0;y<248;y++){
+                for(x=0;x<600;x++){
+                    fin >> r0 >> r1 >>r2;
+
+                        vec_magnitude = getVectorMagnitude(r0,r1,r2);
+                        if(x==0 && y==0){
+                            min_value = vec_magnitude;
+                            max_value = vec_magnitude;
+                        }
+
+                        if(vec_magnitude < min_value){
+                            min_value = vec_magnitude;
+                        }
+                        if(vec_magnitude > max_value){
+                            max_value = vec_magnitude;
+                        }
+
+                        vec_data[x][y][z][0]=r0;vec_data[x][y][z][1]=r1;vec_data[x][y][z][2]=r2;
+                        //vec_mag[x][y] = vec_magnitude;
+
+
+
+                }
+            }
+
+
+        }
+        fin.close();
+
+        result = 1;
+
+        return result;
+}
+
  int extractVectorbyZ(int z_value){
 
         int result = 0;
@@ -397,8 +445,8 @@
                             max_value = vec_magnitude;
                         }
 
-                        vec_data[x][y][0]=r0;vec_data[x][y][1]=r1;vec_data[x][y][2]=r2;
-                        vec_mag[x][y] = vec_magnitude;
+                        vec_data[x][y][z][0]=r0;vec_data[x][y][z][1]=r1;vec_data[x][y][z][2]=r2;
+                        //vec_mag[x][y] = vec_magnitude;
                      }
 
 
@@ -419,7 +467,8 @@
     void renderHedgeHog(){
 
 
-        extractVectorbyZ(z_counter++);
+       // extractVectorbyZ(z_counter++);
+        cout<<"\t z = "<<z_counter;
 
         if(z_counter>=247){
             z_counter=0;
@@ -435,21 +484,19 @@
         glBegin(GL_LINES);
 
         float norm_vec_mag = 0.0;
-        float vec_length = 0.0;
-        float x_c = 0.0f;
-        float y_c = 0.0f;
+        float vec_mag = 0.0;
         float step = 1.0f;
 
         for(int y=0;y<248;y+=10){
             for(int x=0;x<600;x+=10){
                 //for vertex (x,y)
+                vec_mag = getVectorMagnitude(vec_data[x][y][z_counter][0],vec_data[x][y][z_counter][1],vec_data[x][y][z_counter][2]);
+                norm_vec_mag = (vec_mag-min_value)/(max_value-min_value);
+//                vec_length = sqrt(vec_data[x][y][0]*vec_data[x][y][0]+vec_data[x][y][1]*vec_data[x][y][1]);
+//                x_c = (vec_data[x][y][0])/vec_mag[x][y];
+//                y_c = (vec_data[x][y][1])/vec_mag[x][y];
 
-                norm_vec_mag = (vec_mag[x][y]-min_value)/(max_value-min_value);
-                vec_length = sqrt(vec_data[x][y][0]*vec_data[x][y][0]+vec_data[x][y][1]*vec_data[x][y][1]);
-                x_c = (vec_data[x][y][0])/vec_mag[x][y];
-                y_c = (vec_data[x][y][1])/vec_mag[x][y];
-
-                glColor3f(norm_vec_mag,1-norm_vec_mag,0.0f);
+                glColor3f(0.0f,0.2f,norm_vec_mag);
 
 //                glVertex2f(-0.9f+(x+x_c)*0.003,y*0.003);
 //                glVertex2f(-0.9f+(x+vec_data[x][y][0])*0.003,(y+vec_data[x][y][1])*0.003);
@@ -458,7 +505,7 @@
 //                glVertex2f(-0.9f+(x)*0.003,(y+y_c)*0.003);
 
                 glVertex2d(x*step, y*step);
-                glVertex2d((x+vec_data[x][y][0])*step, (y+vec_data[x][y][1])*step);
+                glVertex2d((x+vec_data[x][y][z_counter][0])*step, (y+vec_data[x][y][z_counter][1])*step);
 //
 //                glVertex2d(-0.9f + (x+(vec_length/10)+0.5)*0.1, (y-(vec_length/10)+0.5)*0.1);
 //                glVertex2d(-0.9f + (x+(vec_length/10)+0.5)*0.1, (y+(vec_length/10)+0.5)*0.1);
@@ -496,6 +543,7 @@
 //            }
 //        }
 //
+        z_counter++;
         glEnd();
         glutSwapBuffers();
 
@@ -777,7 +825,7 @@
                 break;
 
         case 15:
-                extract_done = extractVectorbyZ(0);
+                extract_done = extractVectorData();
 
                 cout<<"Extract Done = "<< extract_done<<endl<<"Min_value "<< min_value <<endl<<"Max_value "<< max_value;
 
