@@ -22,6 +22,7 @@ VECTOR vel[600][248][248];
 float curl_mag[600][248][248];
 int first = 0;
 float data_array2D[600][248], norm_data_array2D[600][248];
+int MAX_NUM_ITER = 200;
 
 struct GridPoint{
     float coord_x, coord_y;
@@ -33,7 +34,8 @@ struct Vec_GridPoint{
     VECTOR velocity;
 };
 
-Vec_GridPoint velocity_value_func(Vec_GridPoint ptxy, Vec_GridPoint gridCell[]){
+
+Vec_GridPoint velocity_value_func(Vec_GridPoint ptxy, Vec_GridPoint *gridCell){
 
     float s = (ptxy.coord_x - gridCell[0].coord_x)/(gridCell[1].coord_x-gridCell[0].coord_x);
     float t = (ptxy.coord_y - gridCell[0].coord_y)/(gridCell[1].coord_y-gridCell[0].coord_y);
@@ -58,50 +60,56 @@ Vec_GridPoint velocity_value_func(Vec_GridPoint ptxy, Vec_GridPoint gridCell[]){
 }
 
 
-Vec_GridPoint* locateGridCell(Vec_GridPoint seedPoint){
+void locateGridCell(Vec_GridPoint seedPoint, Vec_GridPoint *cell){
 
 
-    Vec_GridPoint cell[4];
+    int i = int(seedPoint.coord_x);
+    int j = int(seedPoint.coord_y);
+    int k = int(seedPoint.coord_z);
 
-    int i = floor(seedPoint.coord_x);
-    int j = floor(seedPoint.coord_y);
-    int k = floor(seedPoint.coord_z);
-
-    cell[0].coord_x = float(i); cell[0].coord_y = float(j);
+    cell[0].coord_x = i; cell[0].coord_y = j;
     //cell[0].coord_z = float(k);
-
+    /*float a,b,c;
+    a = vec_data[i][j][k][0];
+    b = vec_data[i][j][k][1];
+    c = vec_data[i  ][j][k][2]; */
     cell[0].velocity[0] = vec_data[i][j][k][0];     cell[0].velocity[1] = vec_data[i][j][k][1];
     //cell[0].velocity[2] = vec_data[i][j][k][2];
 
-    cell[1].coord_x = float(i+1); cell[1].coord_y = float(j);
+    cell[1].coord_x = (i+1); cell[1].coord_y = (j);
     cell[1].velocity[0] = vec_data[i+1][j][k][0];     cell[1].velocity[1] = vec_data[i+1][j][k][1];
 
-    cell[2].coord_x = float(i+1); cell[2].coord_y = float(j+1);
+    cell[2].coord_x = (i+1); cell[2].coord_y = (j+1);
     cell[2].velocity[0] = vec_data[i+1][j+1][k][0];     cell[2].velocity[1] = vec_data[i+1][j+1][k][1];
 
-    cell[3].coord_x = float(i); cell[3].coord_y = float(j+1);
+    cell[3].coord_x = (i); cell[3].coord_y = (j+1);
     cell[3].velocity[0] = vec_data[i][j+1][k][0];     cell[3].velocity[1] = vec_data[i][j+1][k][1];
 
-    return cell;
+   // return cell;
 
 }
 
 Vec_GridPoint RK4(Vec_GridPoint initial_pt, float h){
 
     Vec_GridPoint final_pt;
-    Vec_GridPoint delta1, delta2, delta3, delta4;
+    Vec_GridPoint delta1, delta2, delta3;
 
-    float k1, k2, k3, k4, k5;
+    Vec_GridPoint cell[4];
 
-    Vec_GridPoint * cell = locateGridCell(initial_pt);
+    float k1, k2, k3, k4;
 
-    k1 = h * velocity_value_func(initial_pt,cell).velocity[0];
+    locateGridCell(initial_pt, cell);
+
+    Vec_GridPoint gp = velocity_value_func(initial_pt,cell);
+
+    k1 = h * (gp.velocity[0]);
 
     delta1.coord_x = initial_pt.coord_x + (0.5) * h;
     delta1.coord_y = initial_pt.coord_y + (0.5) * k1;
     delta1.coord_z = initial_pt.coord_z;
 
-    cell = locateGridCell(delta1);
+    //cell = locateGridCell(delta1);
+    locateGridCell(delta1, cell);
 
     k2 = h * velocity_value_func(delta1, cell).velocity[0];
 
@@ -109,7 +117,8 @@ Vec_GridPoint RK4(Vec_GridPoint initial_pt, float h){
     delta2.coord_y = initial_pt.coord_y + (0.5) * k2;
     delta2.coord_z = initial_pt.coord_z;
 
-    cell = locateGridCell(delta2);
+    //cell =
+    locateGridCell(delta2,cell);
 
     k3 = h * velocity_value_func(delta2, cell).velocity[0];
 
@@ -117,13 +126,54 @@ Vec_GridPoint RK4(Vec_GridPoint initial_pt, float h){
     delta3.coord_y = initial_pt.coord_y + k3;
     delta3.coord_z = initial_pt.coord_z;
 
-    cell = locateGridCell(delta3);
+    //cell =
+    locateGridCell(delta3,cell);
 
     k4 = h * velocity_value_func(delta3,cell).velocity[0];
 
     final_pt.coord_x = initial_pt.coord_x +h;
+    final_pt.velocity[0] = initial_pt.velocity[0] + (1.0/6.0)*(k1+ 2*k2 + 2*k3 + k4);
     //final_pt.velocity[0] =
 
+    // RK4 in Y direction
+
+    //cell =
+    locateGridCell(initial_pt,cell);
+
+    k1 = h * velocity_value_func(initial_pt,cell).velocity[1];
+
+    delta1.coord_x = initial_pt.coord_x + (0.5) * k1;
+    delta1.coord_y = initial_pt.coord_y + (0.5) * h;
+    delta1.coord_z = initial_pt.coord_z;
+
+    //cell =
+    locateGridCell(delta1,cell);
+
+    k2 = h * velocity_value_func(delta1, cell).velocity[1];
+
+    delta2.coord_x = initial_pt.coord_x + (0.5) * k2;
+    delta2.coord_y = initial_pt.coord_y + (0.5) * h;
+    delta2.coord_z = initial_pt.coord_z;
+
+    //cell =
+    locateGridCell(delta2,cell);
+
+    k3 = h * velocity_value_func(delta2, cell).velocity[1];
+
+    delta3.coord_x = initial_pt.coord_x + k3;
+    delta3.coord_y = initial_pt.coord_y + h;
+    delta3.coord_z = initial_pt.coord_z;
+
+    //cell =
+    locateGridCell(delta3,cell);
+
+    k4 = h * velocity_value_func(delta3,cell).velocity[1];
+
+    final_pt.coord_y = initial_pt.coord_y +h;
+    final_pt.velocity[1] = initial_pt.velocity[1] + (1.0/6.0)*(k1+ 2*k2 + 2*k3 + k4);
+
+    final_pt.coord_z = initial_pt.coord_z;
+    final_pt.velocity[2] = initial_pt.velocity[2];
 
     return final_pt;
 
@@ -471,7 +521,7 @@ int extractVectorData(){
     float vec_magnitude;
     float r0, r1, r2;
     unsigned x,y;
-    for(int z=0;z<248;z++){
+    for(int z=0;z<1;z++){
         for(y=0;y<248;y++){
             for(x=0;x<600;x++){
                 fin >> r0 >> r1 >>r2;
@@ -638,15 +688,57 @@ void renderHedgeHog(){
 }
 void renderStreamLines(){
 
-    GridPoint seedPoints[5];
+    float h = 0.5;
+    int num_iter = 0;
+    Vec_GridPoint seedPoints[2];
 
+    seedPoints[0].coord_x = 350.0;
+    seedPoints[0].coord_y = 124.0;
+    seedPoints[0].coord_z = 0.0;
+
+    seedPoints[0].velocity[0] = vec_data[350][124][0][0];
+    seedPoints[0].velocity[1] = vec_data[350][124][0][1];
+    seedPoints[0].velocity[2] = vec_data[350][124][0][2];
     //set seedPoints : Make this a function instead
 
-    for(int i=0; i<5 ; i++){
+    Vec_GridPoint final_pt, initial_pt;
 
+    //glBegin(GL_LINES);
+    cout<<"Prinitng stream Lines"<<endl;
+
+    cout<<"(350,124) ("<< vec_data[int(seedPoints[0].coord_x)][int(seedPoints[0].coord_y)][int(seedPoints[0].coord_z)][0]<<","<<vec_data[350][124][0][1]<<endl;
+
+    for(int i=0; i<1 ; i++){
+        cout<<"In i = "<< i << " loop"<<endl;
+        initial_pt = seedPoints[i];
+//        initial_pt.coord_x = seedPoints[i].coord_x;
+//        initial_pt.coord_y = seedPoints[i].coord_y;
+//        initial_pt.coord_z = seedPoints[i].coord_z;
+        final_pt.coord_x = 2.0;
+        final_pt.coord_y = 2.0;
+        while(num_iter < MAX_NUM_ITER && (final_pt.coord_x!=initial_pt.coord_x && final_pt.coord_y!=initial_pt.coord_y)
+              && final_pt.coord_x < 599 && final_pt.coord_x > 0 && final_pt.coord_y < 247 && final_pt.coord_y > 0){
+
+                cout<<"Initial Point ("<< initial_pt.coord_x << " , "<<initial_pt.coord_y<<") Values ("
+                <<initial_pt.velocity[0]<<" , " << initial_pt.velocity[1]<<" )" << endl;
+                final_pt = RK4(initial_pt, h);
+                //glColor3f(0.0f,0.5f,0.5f);
+
+                //glVertex2d(initial_pt.coord_x, initial_pt.coord_y);
+                //glVertex2d(final_pt.coord_x, final_pt.coord_y);
+
+                initial_pt = final_pt;
+
+                num_iter++;
+
+        }
 
 
     }
+
+    //glEnd();
+
+    //glutSwapBuffers();
 
 
 }
@@ -807,9 +899,10 @@ void initOpenGL(){
 int main(int argc, char **argv){
 
     input_file_name = argv[1];
-
+    //input_file_name = "../velocity.0100.txt";
 
     string scalarName = argv[2];
+    //string scalarName = "velocity";
 
     int scalar_index=0;
 
@@ -827,18 +920,19 @@ int main(int argc, char **argv){
     }
 
     string map_type = argv[3];
+    //string map_type = "streamlines";
 
     cout<<endl<<input_file_name<<" " << scalarName<< " " << map_type <<endl;
     int extract_done =0;
 
 
 
-    glutInit(&argc,argv);
-    glutInitDisplayMode(GLUT_DOUBLE|GLUT_RGBA|GLUT_DEPTH);
-    glutInitWindowSize(500,500);
-    glutInitWindowPosition(100,100);
-    glutCreateWindow("Assignment 1");
-    initOpenGL();
+//    glutInit(&argc,argv);
+//    glutInitDisplayMode(GLUT_DOUBLE|GLUT_RGBA|GLUT_DEPTH);
+//    glutInitWindowSize(500,500);
+//    glutInitWindowPosition(100,100);
+//    glutCreateWindow("Assignment 1");
+//    initOpenGL();
 
     switch(scalar_index){
 
@@ -926,8 +1020,9 @@ int main(int argc, char **argv){
                     glutIdleFunc(renderHedgeHog);
                 }
                 if(map_type=="streamlines"){
-                    glutDisplayFunc(renderStreamLines);
-                    glutIdleFunc(renderStreamLines);
+                    //glutDisplayFunc(renderStreamLines);
+                    //glutIdleFunc(renderStreamLines);
+                    renderStreamLines();
                 }
             }else{
                 cout<<"Unable to extract data";
@@ -943,8 +1038,8 @@ int main(int argc, char **argv){
     }
 
 
-    glutReshapeFunc(reshape);
-    glutMainLoop();
+   // glutReshapeFunc(reshape);
+    //glutMainLoop();
     return 0;
 }
 
