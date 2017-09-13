@@ -33,7 +33,7 @@ struct Vec_GridPoint{
     VECTOR velocity;
 };
 
-Vec_GridPoint velocity_value_func(Vec_GridPoint ptxy, Vec_GridPoint *gridCell){
+Vec_GridPoint velocity_value_func(Vec_GridPoint ptxy, Vec_GridPoint gridCell[]){
 
     float s = (ptxy.coord_x - gridCell[0].coord_x)/(gridCell[1].coord_x-gridCell[0].coord_x);
     float t = (ptxy.coord_y - gridCell[0].coord_y)/(gridCell[1].coord_y-gridCell[0].coord_y);
@@ -58,7 +58,7 @@ Vec_GridPoint velocity_value_func(Vec_GridPoint ptxy, Vec_GridPoint *gridCell){
 }
 
 
-Vec_GridPoint * locateGridCell(Vec_GridPoint seedPoint){
+Vec_GridPoint* locateGridCell(Vec_GridPoint seedPoint){
 
 
     Vec_GridPoint cell[4];
@@ -89,12 +89,40 @@ Vec_GridPoint * locateGridCell(Vec_GridPoint seedPoint){
 Vec_GridPoint RK4(Vec_GridPoint initial_pt, float h){
 
     Vec_GridPoint final_pt;
+    Vec_GridPoint delta1, delta2, delta3, delta4;
 
     float k1, k2, k3, k4, k5;
 
-    k1 = h * initial_pt.velocity[0];
-    k2 =h;
+    Vec_GridPoint * cell = locateGridCell(initial_pt);
 
+    k1 = h * velocity_value_func(initial_pt,cell).velocity[0];
+
+    delta1.coord_x = initial_pt.coord_x + (0.5) * h;
+    delta1.coord_y = initial_pt.coord_y + (0.5) * k1;
+    delta1.coord_z = initial_pt.coord_z;
+
+    cell = locateGridCell(delta1);
+
+    k2 = h * velocity_value_func(delta1, cell).velocity[0];
+
+    delta2.coord_x = initial_pt.coord_x + (0.5) * h;
+    delta2.coord_y = initial_pt.coord_y + (0.5) * k2;
+    delta2.coord_z = initial_pt.coord_z;
+
+    cell = locateGridCell(delta2);
+
+    k3 = h * velocity_value_func(delta2, cell).velocity[0];
+
+    delta3.coord_x = initial_pt.coord_x + h;
+    delta3.coord_y = initial_pt.coord_y + k3;
+    delta3.coord_z = initial_pt.coord_z;
+
+    cell = locateGridCell(delta3);
+
+    k4 = h * velocity_value_func(delta3,cell).velocity[0];
+
+    final_pt.coord_x = initial_pt.coord_x +h;
+    //final_pt.velocity[0] =
 
 
     return final_pt;
