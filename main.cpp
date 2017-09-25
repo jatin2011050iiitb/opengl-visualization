@@ -8,47 +8,256 @@
 #include <math.h>
 
 using namespace std;
-
-float counter =-1;
-int z_counter = 0;
-string input_file_name;
+string vector_file_name;
 string scalar_file_name;
+int MAX_NUM_ITER = 600;
+int z_test = 50;
+
+
+int z_key=0; // this variable is used to navigate up/down z values w.r.t the x-y values shown on graph
+
+typedef float SCALAR[3];
+SCALAR scalar_data[600][248][248]; // to store scalar data for 3 scalars: density, pressure & magnitude of Curl
+SCALAR norm_scalar_data[600][248][248]; // to store normalized data
+float scalar_min_max[2][3];// row 0 stores min, row 1 stores max
+
+typedef float VECTOR[3];
+VECTOR vector_data[600][248][248];
+VECTOR vector_min_max[2];
 float min_value=0.0f;
 float max_value=0.0f;
-typedef float VECTOR[3];
-VECTOR vec_data[600][248][248];
-float vec_mag[600][248];
-VECTOR vel[600][248][248];
-float curl_mag[600][248][248];
-int first = 0;
-float data_array2D[600][248], norm_data_array2D[600][248];
-int MAX_NUM_ITER = 600;
 
+
+static int menu_value = 0; // this is the value selected from the menu
+static int window;
+int scalar_index=0;
+int integration_fn=0;
 
 struct GridPoint{
     float coord_x, coord_y;
     float scalar_value;
 };
-
 struct Vec_GridPoint{
     float coord_x, coord_y,coord_z;
     VECTOR velocity;
 };
+struct LineSegment {
+GridPoint point1, point2;
+};
+struct SaddleSegments {
+    LineSegment segment_a, segment_b;
+};
+Vec_GridPoint seedPoints[10];
+
+int extractScalarData(){
+
+    int result = 0;
+    float scalar[10];
+    ifstream fin(scalar_file_name.c_str());
+
+    if(!fin){
+        cout<<"Could not open " << scalar_file_name << " for reading";
+        return -2;
+    }
+
+    cout<<endl<<"Reading Scalar Data File : "<< scalar_file_name;
+
+    for(int z=0;z<248 && z< z_test;z++){
+        for(int y=0;y<248;y++){
+            for(int x=0;x<600;x++){
+                fin >> scalar[0] >> scalar[1] >>scalar[2] >>scalar[3] >>scalar[4] >>scalar[5] >>scalar[6] >>scalar[7] >>scalar[8] >>scalar[9];
+                    if(x==0 && y==0 && z==0 ){
+                        scalar_min_max[0][0]= scalar[0];scalar_min_max[0][1]= scalar[1];
+                        scalar_min_max[1][0]= scalar[0];scalar_min_max[1][1]= scalar[1];
+                    }
+                    if(scalar[0] > scalar_min_max[1][0] ){
+                        scalar_min_max[1][0] = scalar[0];
+                    }
+                    if(scalar[1] > scalar_min_max[1][1] ){
+                        scalar_min_max[1][1] = scalar[1];
+                    }
+                    if(scalar[0] < scalar_min_max[0][0] ){
+                        scalar_min_max[0][0] = scalar[0];
+                    }
+                    if(scalar[1] < scalar_min_max[0][1] ){
+                        scalar_min_max[0][1] = scalar[1];
+                    }
+                    scalar_data[x][y][z][0] = scalar[0];
+                    scalar_data[x][y][z][1] = scalar[1];
+
+            }
+        }
+    }
+
+    cout<<endl<<"Scalar Data Reading Complete";
+    result = 1;
+    fin.close();
+return result;
+
+}
+
+int normalize_scalar_data(){
+
+    int result=0;
+    cout<<endl<<"Scalar Data Normalization begins"<<endl;
+    for(int x=0; x<600; x++){
+        for(int y=0; y<248; y++){
+            for(int z=0; z<248 && z<z_test; z++){
+                for(int i=0; i<3; i++){
+                    norm_scalar_data[x][y][z][i] = (scalar_data[x][y][z][i] - scalar_min_max[0][i])/(scalar_min_max[1][i]-scalar_min_max[0][i]);
+                }
+            }
+        }
+    }
+    result=1;
+    cout<<endl<<"Normalization complete"<<endl;
+    return result;
+}
+
+
+float getVectorMagnitude(float  fi, float fj, float fk){
+    return sqrt(fi*fi+fj*fj+fk*fk);
+}
+
+int extractVectorData(){
+
+    int result = 0;
+    ifstream fin(vector_file_name.c_str());
+    if(!fin){
+        cout<<"Could not open " << vector_file_name << " for reading";
+        return -2;
+    }
+    cout<<endl<<"Reading Vector Data File : "<< vector_file_name;
+    float vec_magnitude;
+    float r0, r1, r2;
+    unsigned x,y,z;
+    for(z=0;z<248 && z<z_test;z++){
+        for(y=0;y<248;y++){
+            for(x=0;x<600;x++){
+                fin >> r0 >> r1 >>r2;
+
+                    vec_magnitude = getVectorMagnitude(r0,r1,r2);
+                    if(x==0 && y==0 && z==0){
+                        min_value = vec_magnitude;
+                        max_value = vec_magnitude;
+                    }
+
+                    if(vec_magnitude < min_value){
+                        min_value = vec_magnitude;
+                    }
+                    if(vec_magnitude > max_value){
+                        max_value = vec_magnitude;
+                    }
+
+                    vector_data[x][y][z][0]=r0;
+                    vector_data[x][y][z][1]=r1;
+                    vector_data[x][y][z][2]=r2;
+            }
+        }
+
+
+    }
+    fin.close();
+
+    cout<<endl<<"Calculating curl"<<endl;
+    for(z=0;z<248;z++){
+    for(y=0;y<248;y++){
+        for(x=0;x<600;x++){
+            if((x==599) || (y==247)||(z==247)){
+                scalar_data[x][y][z][2]=0.0;
+            }else{
+                VECTOR curl;
+                curl[0] = (vector_data[x][y+1][z][2]-vector_data[x][y][z][2]-vector_data[x][y][z+1][1]+vector_data[x][y][z][1])/0.001;
+                curl[1] = (vector_data[x][y][z+1][0]-vector_data[x][y][z][0]-vector_data[x+1][y][z][2]+vector_data[x][y][z][2])/0.001;
+                curl[2] = (vector_data[x+1][y][z][1]-vector_data[x][y][z][1]-vector_data[x][y+1][z][0]+vector_data[x][y][z][0])/0.001;
+                scalar_data[x][y][z][2]= sqrt(curl[0]*curl[0]+curl[1]*curl[1]+curl[2]*curl[2]);
+            }
+
+        }
+    }
+    }
+
+    cout<<endl<<"Completed calculating Curl"<<endl<<"Vector Data File reading Complete"<<endl;
+
+    result = 1;
+
+    return result;
+}
+
+
+void processSpecialKeys(int key, int x, int y) {
+
+ switch(key){
+
+    case GLUT_KEY_UP:  if(z_key<247 && z_key < z_test){  z_key++; cout<<endl<<"z_key inc :"<<z_key<<endl;   }else{  z_key=0;    }
+            break;
+    case GLUT_KEY_DOWN: if(z_key>0 ){  z_key--;   cout<<endl<<"z_key dec :"<<z_key<<endl; }else{  z_key=z_test;    }
+            break;
+
+ }
+
+  glutPostRedisplay();
+
+}
+
+
+void menu(int num){
+    if(num == 'q'){
+        glutDestroyWindow(window);
+        exit(0);
+    }else{
+        menu_value = num;
+    }
+    glutPostRedisplay();
+}
+    //creating menu
+void createMenu(void){
+
+    int colorMapMenu = glutCreateMenu(menu);
+    glutAddMenuEntry("Density",0);
+    glutAddMenuEntry("Temperature",1);
+    glutAddMenuEntry("Magnitude.Curl",2);
+
+    int heightMapMenu = glutCreateMenu(menu);
+    glutAddMenuEntry("Density",3);
+    glutAddMenuEntry("Temperature",4);
+    glutAddMenuEntry("Magnitude.Curl",5);
+
+    int contourMapMenu = glutCreateMenu(menu);
+    glutAddMenuEntry("Density",6);
+    glutAddMenuEntry("Temperature",7);
+    glutAddMenuEntry("Magnitude.Curl",8);
+
+    int scalarMenu = glutCreateMenu(menu);
+    glutAddSubMenu("Color Map", colorMapMenu);
+    glutAddSubMenu("Height Map", heightMapMenu );
+    glutAddSubMenu("Contour Map", contourMapMenu );
+
+    int streamLinesMenu = glutCreateMenu(menu);
+    glutAddMenuEntry("Euler's",10);
+    glutAddMenuEntry("RK4",11);
+
+    int vectorMenu = glutCreateMenu(menu);
+    glutAddMenuEntry("HedgeHog",9);
+    glutAddSubMenu("Stream Lines",streamLinesMenu);
+
+    glutCreateMenu(menu);
+    glutAddSubMenu("Scalar Viz", scalarMenu);
+    glutAddSubMenu("Vector Viz", vectorMenu);
+    glutAddMenuEntry("Quit",'q');
+    glutAttachMenu(GLUT_RIGHT_BUTTON);
+
+}
+
+
 
 Vec_GridPoint cell[4];
-Vec_GridPoint seedPoints[10];
 
 Vec_GridPoint velocity_value_func(Vec_GridPoint ptxy){
 
-    //cout<<"Ptxy"<< ptxy.coord_x << " " << ptxy.coord_y<<endl;
-    //cout<<"Velo"<< ptxy.velocity[0] << " "<<ptxy.velocity[1]<<endl;
 
-   // if((ptxy.coord_x != cell[0].coord_x) && (ptxy.coord_y != cell[0].coord_y)){
     float s = (ptxy.coord_x - cell[0].coord_x)/(cell[1].coord_x - cell[0].coord_x);
     float t = (ptxy.coord_y - cell[0].coord_y)/(cell[3].coord_y - cell[0].coord_y);
-
-    //cout<<"(s,t)"<<s<<","<<t<<endl;
-
 
     ptxy.velocity[0] =  (1-s)*(1-t  )* cell[0].velocity[0] +
                         (1-s)*(t    )* cell[3].velocity[0] +
@@ -69,7 +278,6 @@ Vec_GridPoint velocity_value_func(Vec_GridPoint ptxy){
 
 }
 
-
 void locateGridCell(Vec_GridPoint seedPoint){
 
 
@@ -77,30 +285,21 @@ void locateGridCell(Vec_GridPoint seedPoint){
     int j = int(seedPoint.coord_y);
     int k = int(seedPoint.coord_z);
 
-    //cout<<"(i,j,k)("<<i<<","<<j<<","<<k<<")"<<endl;
-
     cell[0].coord_x = i; cell[0].coord_y = j;
-    cell[0].velocity[0] = vec_data[i][j][k][0];     cell[0].velocity[1] = vec_data[i][j][k][1];
-    //cell[0].velocity[2] = vec_data[i][j][k][2];
-    //cout<<"cell[0].c"<<cell[0].coord_x << " "<<cell[0].coord_y<<endl;
-    //cout<<"cell[0].v"<<cell[0].velocity[0]<< " "<< cell[0].velocity[1] <<endl;
+    cell[0].velocity[0] = vector_data[i][j][k][0];     cell[0].velocity[1] = vector_data[i][j][k][1];
+
 
     cell[1].coord_x = (i+1); cell[1].coord_y = (j);
-    cell[1].velocity[0] = vec_data[i+1][j][k][0];     cell[1].velocity[1] = vec_data[i+1][j][k][1];
-   // cout<<"cell[1].c"<<cell[1].coord_x << " "<<cell[1].coord_y<<endl;
-    //cout<<"cell[1].v"<<cell[1].velocity[0]<< " "<< cell[1].velocity[1] <<endl;
+    cell[1].velocity[0] = vector_data[i+1][j][k][0];     cell[1].velocity[1] = vector_data[i+1][j][k][1];
+
 
     cell[2].coord_x = (i+1); cell[2].coord_y = (j+1);
-    cell[2].velocity[0] = vec_data[i+1][j+1][k][0];     cell[2].velocity[1] = vec_data[i+1][j+1][k][1];
-    //cout<<"cell[2].c"<<cell[2].coord_x << " "<<cell[2].coord_y<<endl;
-    //cout<<"cell[2].v"<<cell[2].velocity[0]<< " "<< cell[2].velocity[1] <<endl;
+    cell[2].velocity[0] = vector_data[i+1][j+1][k][0];     cell[2].velocity[1] = vector_data[i+1][j+1][k][1];
+
 
     cell[3].coord_x = (i); cell[3].coord_y = (j+1);
-    cell[3].velocity[0] = vec_data[i][j+1][k][0];     cell[3].velocity[1] = vec_data[i][j+1][k][1];
-    //cout<<"cell[3].c"<<cell[3].coord_x << " "<<cell[3].coord_y<<endl;
-    //cout<<"cell[3].v"<<cell[3].velocity[0]<< " "<< cell[3].velocity[1] <<endl;
+    cell[3].velocity[0] = vector_data[i][j+1][k][0];     cell[3].velocity[1] = vector_data[i][j+1][k][1];
 
-   // return cell;
 
 }
 Vec_GridPoint EulersLI(Vec_GridPoint initial_pt){
@@ -123,6 +322,7 @@ Vec_GridPoint EulersLI(Vec_GridPoint initial_pt){
     return final_pt;
 
 }
+
 Vec_GridPoint RK4(Vec_GridPoint initial_pt, float h){
 
     Vec_GridPoint final_pt;
@@ -212,12 +412,7 @@ Vec_GridPoint RK4(Vec_GridPoint initial_pt, float h){
 
 }
 
-struct LineSegment {
-GridPoint point1, point2;
-};
-struct SaddleSegments {
-    LineSegment segment_a, segment_b;
-};
+
 SaddleSegments getSaddleSegments(int case_number, GridPoint *gp_array ){
     SaddleSegments segments;
 
@@ -363,111 +558,221 @@ int getCaseNumberByGridPointsCutoff(float cutoff, GridPoint *gp_array){
     return caseNumber;
 
 }
+
+
+void drawText(const char *text, int length, int x, int y){
+
+    glMatrixMode(GL_PROJECTION);
+    double matrix[16];
+    glGetDoublev(GL_PROJECTION_MATRIX, matrix);
+    glLoadIdentity();
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    glPushMatrix();
+    glLoadIdentity();
+
+//    float x_t = -1.0 + float(x+300)/500.0;
+//    float y_t = -1.0 + float(y+300)/500.0;
+
+    float x_t = float(x+300)/1000.0;
+    float y_t = float(y+300)/1000.0;
+
+
+    glRasterPos2i(0.9,-0.9);
+
+    for(int i=0; i< length;i++){
+        glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, (int)text[i]);
+    }
+    glPopMatrix();
+    glMatrixMode(GL_PROJECTION);
+    glLoadMatrixd(matrix);
+    glMatrixMode(GL_MODELVIEW);
+    glutSwapBuffers();
+}
+
 void renderColorMap(){
 
     glClear(GL_COLOR_BUFFER_BIT| GL_DEPTH_BUFFER_BIT);
     glLoadIdentity();
+
+    glPushMatrix();
+    glBegin(GL_LINES);
+
+    glColor3f(0.0f,0.0f,1.0f);
+    glVertex2f(0.0,0.0);
+    glVertex2f(649.0,0.0);
+
+    glColor3f(0.0f,1.0f,0.0f);
+    glVertex2f(0.0,0.0);
+    glVertex2f(0.0,299.0);
+
+    glEnd();
+    glPopMatrix();
+
+//    glPushMatrix();
+//
+//    string text;
+//    text="X";
+//    glColor3f(1,0,0);
+//    drawText(text.data(),text.size(),650,0);
+//    glPopMatrix();
+//    glPushMatrix();
+//    text="Y";
+//    glColor3f(1,0,0);
+//    drawText(text.data(),text.size(),0,300);
+//
+//    glPopMatrix();
 
     glBegin(GL_QUADS);
 
     for(int y=0;y<(248-1);y++){
         for(int x=0;x<(600-1);x++){
             //for vertex(x,y)
-            glColor3f(norm_data_array2D[x][y],0.0f,0.0f);
-            glVertex2f(-0.9f+x*0.003,-0.375f+y*0.003);
+            glColor3f(norm_scalar_data[x][y][z_key][scalar_index],0.0f,0.0f);
+            glVertex2f(x,y);
 
             //for vertex (x+1,y)
-            glColor3f(norm_data_array2D[x+1][y],0.0f,0.0f);
-            glVertex2f(-0.9f+(x+1)*0.003,-0.375f+y*0.003);
+            glColor3f(norm_scalar_data[(x+1)][y][z_key][scalar_index],0.0f,0.0f);
+            glVertex2f((x+1),y);
 
             //for vertex (x+1,y+1)
-            glColor3f(norm_data_array2D[x+1][y+1],0.0f,0.0f);
-            glVertex2f(-0.9f+(x+1)*0.003,-0.375f+(y+1)*0.003);
+            glColor3f(norm_scalar_data[(x+1)][(y+1)][z_key][scalar_index],0.0f,0.0f);
+            glVertex2f((x+1),(y+1));
 
             //for vertex (x,y+1)
-            glColor3f(norm_data_array2D[x][y+1],0.0f,0.0f);
-            glVertex2f(-0.9f+x*0.003,-0.375f+(y+1)*0.003);
+            glColor3f(norm_scalar_data[x][(y+1)][z_key][scalar_index],0.0f,0.0f);
+            glVertex2f(x,(y+1));
 
             }
         }
 
-        glEnd();
+    glEnd();
+
+    glBegin(GL_QUADS);
+
+        glColor3f(0.0f,0.0f,0.0f);
+        glVertex2f(150.0,-120.0);
+        glColor3f(0.0f,0.0f,0.0f);
+        glVertex2f(150.0,-150.0);
+        glColor3f(1.0f,0.0f,0.0f);
+        glVertex2f(450.0,-150.0);
+        glColor3f(1.0f,0.0f,0.0f);
+        glVertex2f(450.0,-120.0);
+
+
+
+    glEnd();
+
     glutSwapBuffers();
 
 }
 void renderHeightMap(){
 
+
     glClear(GL_COLOR_BUFFER_BIT| GL_DEPTH_BUFFER_BIT);
 
     glLoadIdentity();
-    gluLookAt(-0.1,0.5, 0.5,  /* eye is at (-0.1,0.5, 0.5) */
-    0.0, 0.0, 0.0,      /* center is at (0,0,0) */
-    0.0, 1.0, 0.);
+//    gluLookAt(-0.1,0.5, 0.5,  /* eye is at (-0.1,0.5, 0.5) */
+//    0.0, 0.0, 0.0,      /* center is at (0,0,0) */
+//    0.0, 1.0, 0.);
+//
+//    glRotatef( counter , 1.0, 1.0 , 1.0 );
+//    counter+=0.01;
+//    if(counter>=1)counter=-1;
+    glPushMatrix();
+    glBegin(GL_LINES);
 
-    glRotatef( counter , 1.0, 1.0 , 1.0 );
-    counter+=0.01;
-    if(counter>=1)counter=-1;
+    glColor3f(1.0f,0.0f,0.0f);
+    glVertex2f(0.0,0.0);
+    glVertex2f(649.0,0.0);
 
+    glColor3f(0.0f,1.0f,0.0f);
+    glVertex2f(0.0,0.0);
+    glVertex2f(0.0,299.0);
+
+    glEnd();
+    glPopMatrix();
 
     glBegin(GL_TRIANGLE_STRIP);
 
     for(int x=0;x<(600-1);x++){
         for(int y=0;y<(248-1);y++){
             //for vertex (x,y)
-            glColor3f(0.0f,0.0f,norm_data_array2D[x][y]);
-            glVertex3f(x*0.001,norm_data_array2D[x][y],y*0.001);
+            glColor3f(0.0f,0.0f,norm_scalar_data[x][y][z_key][scalar_index]);
+            glVertex3f(x,250*norm_scalar_data[x][y][z_key][scalar_index],y);
 
             //for vertex (x+1,y)
-            glColor3f(0.0f,0.0f,norm_data_array2D[(x+1)][y]);
-            glVertex3f((x+1)*0.001,norm_data_array2D[(x+1)][y],y*0.001);
+            glColor3f(0.0f,0.0f,norm_scalar_data[(x+1)][y][z_key][scalar_index]);
+            glVertex3f((x+1),250*norm_scalar_data[(x+1)][y][z_key][scalar_index],y);
 
             //for vertex (x,y+1)
-            glColor3f(0.0f,0.0f,norm_data_array2D[x][(y+1)]);
-            glVertex3f(x*0.001,norm_data_array2D[x][(y+1)],(y+1)*0.001);
+            glColor3f(0.0f,0.0f,norm_scalar_data[x][(y+1)][z_key][scalar_index]);
+            glVertex3f(x,250*norm_scalar_data[x][(y+1)][z_key][scalar_index],(y+1));
 
             //for vertex (x+1,y+1)
-            glColor3f(0.0f,0.0f,norm_data_array2D[(x+1)][(y+1)]);
-            glVertex3f((x+1)*0.001,norm_data_array2D[(x+1)][(y+1)],(y+1)*0.001);
+            glColor3f(0.0f,0.0f,norm_scalar_data[(x+1)][(y+1)][z_key][scalar_index]);
+            glVertex3f((x+1),250*norm_scalar_data[(x+1)][(y+1)][z_key][scalar_index],(y+1));
 
         }
     }
 
     glEnd();
 
-
+    glBegin(GL_QUADS);
+        glColor3f(0.0f,0.0f,0.0f);
+        glVertex2f(150.0,-120.0);
+        glColor3f(0.0f,0.0f,0.0f);
+        glVertex2f(150.0,-150.0);
+        glColor3f(0.0f,0.0f,1.0f);
+        glVertex2f(450.0,-150.0);
+        glColor3f(0.0f,0.0f,1.0f);
+        glVertex2f(450.0,-120.0);
+    glEnd();
 
     glutSwapBuffers();
 
 }
 void renderContourMap(){
 
-    glClearColor(0.0f, 0.0f,0.0f, 0.1f);
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
     glLoadIdentity();
 
-    cout<<"Rendering Quads";
-    glBegin(GL_QUADS);
+    glPushMatrix();
+    glBegin(GL_LINES);
 
+    glColor3f(0.0f,0.0f,1.0f);
+    glVertex2f(0.0,0.0);
+    glVertex2f(649.0,0.0);
+
+    glColor3f(0.0f,1.0f,0.0f);
+    glVertex2f(0.0,0.0);
+    glVertex2f(0.0,299.0);
+
+    glEnd();
+    glPopMatrix();
+
+
+    glBegin(GL_QUADS);
     for(int y=0;y<(248-1);y++){
         for(int x=0;x<(600-1);x++){
-            //for vertex (x,y)
-            glColor3f(norm_data_array2D[x][y],0.0f,0.0f);
-            glVertex2f(-0.9f+x*0.003,-0.375f+y*0.003);
+            //for vertex(x,y)
+            glColor3f(norm_scalar_data[x][y][z_key][scalar_index],0.0f,0.0f);
+            glVertex2f(x,y);
 
             //for vertex (x+1,y)
-            glColor3f(norm_data_array2D[x+1][y],0.0f,0.0f);
-            glVertex2f(-0.9f+(x+1)*0.003,-0.375f+y*0.003);
+            glColor3f(norm_scalar_data[(x+1)][y][z_key][scalar_index],0.0f,0.0f);
+            glVertex2f((x+1),y);
 
             //for vertex (x+1,y+1)
-            glColor3f(norm_data_array2D[x+1][y+1],0.0f,0.0f);
-            glVertex2f(-0.9f+(x+1)*0.003,-0.375f+(y+1)*0.003);
+            glColor3f(norm_scalar_data[(x+1)][(y+1)][z_key][scalar_index],0.0f,0.0f);
+            glVertex2f((x+1),(y+1));
 
             //for vertex (x,y+1)
-            glColor3f(norm_data_array2D[x][y+1],0.0f,0.0f);
-            glVertex2f(-0.9f+x*0.003,-0.375f+(y+1)*0.003);
+            glColor3f(norm_scalar_data[x][(y+1)][z_key][scalar_index],0.0f,0.0f);
+            glVertex2f(x,(y+1));
 
+            }
         }
-    }
 
     glEnd();
 
@@ -479,52 +784,58 @@ void renderContourMap(){
 
 
     int case_num =0;
-    float cut_off[10] = {500.0f, 1000.0f, 2000.f, 3000.0f, 4000.0f};
 
-    cout<<"rendering lines";
+    float cut_off[5] = {500.0f, 1000.0f, 2000.f, 3000.0f, 4000.0f};
+
     glBegin(GL_LINES);
 
-    glColor3f(1.0f,1.0f,0.0f);
+
 
     for(int contour_index = 0; contour_index <5 ; contour_index++){
+
+        switch(contour_index){
+        case 0  :   glColor3f(0.0f,0.0f,0.0f); break;
+        case 1  :   glColor3f(0.5f,0.5f,0.0f); break;
+        case 2  :   glColor3f(0.0f,0.5f,0.5f); break;
+        case 3  :   glColor3f(0.5f,0.0f,0.5f); break;
+        case 4  :   glColor3f(0.5f,0.5f,0.5f); break;
+        }
+
         for(int y=0;y<(248-1);y++){
             for(int x=0;x<(600-1);x++){
 
                 gp_array[0].coord_x=x;
                 gp_array[0].coord_y=y;
-                gp_array[0].scalar_value=data_array2D[x][y];
+                gp_array[0].scalar_value=scalar_data[x][y][z_key][scalar_index];
 
                 gp_array[1].coord_x=(x+1);
                 gp_array[1].coord_y=y;
-                gp_array[1].scalar_value=data_array2D[(x+1)][y];
+                gp_array[1].scalar_value=scalar_data[(x+1)][y][z_key][scalar_index];
 
                 gp_array[2].coord_x=(x+1);
                 gp_array[2].coord_y=(y+1);
-                gp_array[2].scalar_value=data_array2D[(x+1)][(y+1)];
+                gp_array[2].scalar_value=scalar_data[(x+1)][(y+1)][z_key][scalar_index];
 
                 gp_array[3].coord_x=x;
                 gp_array[3].coord_y=(y+1);
-                gp_array[3].scalar_value=data_array2D[x][(y+1)];
+                gp_array[3].scalar_value=scalar_data[x][(y+1)][z_key][scalar_index];
 
                 case_num = getCaseNumberByGridPointsCutoff(cut_off[contour_index], gp_array);
-                if(first==0){
-                    cout<<"Case:" <<case_num<<endl;
-                }
 
                 if(case_num!=0 && case_num!=15){
                     if(case_num!=5 && case_num!=10){
 
                         ls = getLineSegmentByCase(case_num, gp_array);
-                        glVertex2f(-0.9f+(ls.point1.coord_x)*0.003,-0.375f+(ls.point1.coord_y)*0.003);
-                        glVertex2f(-0.9f+(ls.point2.coord_x)*0.003,-0.375f+(ls.point2.coord_y)*0.003);
+                        glVertex2f(ls.point1.coord_x,ls.point1.coord_y);
+                        glVertex2f(ls.point2.coord_x,ls.point2.coord_y);
 
                     }else{
                             ss = getSaddleSegments(case_num, gp_array);
-                            glVertex2f(-0.9f+(ss.segment_a.point1.coord_x)*0.003,-0.375f+(ss.segment_a.point1.coord_y)*0.003);
-                            glVertex2f(-0.9f+(ss.segment_a.point2.coord_x)*0.003,-0.375f+(ss.segment_a.point2.coord_y)*0.003);
+                            glVertex2f(ss.segment_a.point1.coord_x,ss.segment_a.point1.coord_y);
+                            glVertex2f(ss.segment_a.point2.coord_x,ss.segment_a.point2.coord_y);
 
-                            glVertex2f(-0.9f+(ss.segment_b.point1.coord_x)*0.003,-0.375f+(ss.segment_b.point1.coord_y)*0.003);
-                            glVertex2f(-0.9f+(ss.segment_b.point2.coord_x)*0.003,-0.375f+(ss.segment_b.point2.coord_y)*0.003);
+                            glVertex2f(ss.segment_b.point1.coord_x,ss.segment_b.point1.coord_y);
+                            glVertex2f(ss.segment_b.point2.coord_x,ss.segment_b.point2.coord_y);
                         }
 
                 }
@@ -533,243 +844,102 @@ void renderContourMap(){
         }
     }
 
-    if(first==0)first++;
     glEnd();
-
     glutSwapBuffers();
 
 }
-float getVectorMagnitude(float  fi, float fj, float fk){
-    return sqrt(fi*fi+fj*fj+fk*fk);
-}
-int extractVectorData(){
-
-    int result = 0;
-    ifstream fin(input_file_name.c_str());
-    if(!fin){
-        cout<<"Could not open " << input_file_name << " for reading";
-        return -2;
-    }
-
-    float vec_magnitude;
-    float r0, r1, r2;
-    unsigned x,y;
-    for(int z=0;z<248;z++){
-        for(y=0;y<248;y++){
-            for(x=0;x<600;x++){
-                fin >> r0 >> r1 >>r2;
-
-                    vec_magnitude = getVectorMagnitude(r0,r1,r2);
-                    if(x==0 && y==0){
-                        min_value = vec_magnitude;
-                        max_value = vec_magnitude;
-                    }
-
-                    if(vec_magnitude < min_value){
-                        min_value = vec_magnitude;
-                    }
-                    if(vec_magnitude > max_value){
-                        max_value = vec_magnitude;
-                    }
-
-                    vec_data[x][y][z][0]=r0;vec_data[x][y][z][1]=r1;vec_data[x][y][z][2]=r2;
-                    //vec_mag[x][y] = vec_magnitude;
 
 
-
-            }
-        }
-
-
-    }
-    fin.close();
-
-    result = 1;
-
-    return result;
-}
-int extractVectorbyZ(int z_value){
-
-    int result = 0;
-    ifstream fin(input_file_name.c_str());
-    if(!fin){
-        cout<<"Could not open " << input_file_name << " for reading";
-        return -2;
-    }
-
-    float vec_magnitude;
-    float r0, r1, r2;
-    unsigned x,y;
-    for(int z=0;z<248;z++){
-        for(y=0;y<248;y++){
-            for(x=0;x<600;x++){
-                fin >> r0 >> r1 >>r2;
-                 if(z==z_value){
-                    vec_magnitude = getVectorMagnitude(r0,r1,r2);
-                    if(x==0 && y==0){
-                        min_value = vec_magnitude;
-                        max_value = vec_magnitude;
-                    }
-
-                    if(vec_magnitude < min_value){
-                        min_value = vec_magnitude;
-                    }
-                    if(vec_magnitude > max_value){
-                        max_value = vec_magnitude;
-                    }
-
-                    vec_data[x][y][z][0]=r0;vec_data[x][y][z][1]=r1;vec_data[x][y][z][2]=r2;
-                    //vec_mag[x][y] = vec_magnitude;
-                 }
-
-
-            }
-        }
-
-        if(z==z_value)break;
-
-    }
-    fin.close();
-
-    result = 1;
-
-    return result;
-}
 void renderHedgeHog(){
 
 
-   // extractVectorbyZ(z_counter++);
-    cout<<"\t z = "<<z_counter;
-
-    if(z_counter>=247){
-        z_counter=0;
-
-    }
-
-    glClearColor(0.0f, 0.0f,0.0f, 0.1f);
+    //glClearColor(0.0f, 0.0f,0.0f, 0.1f);
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
     glLoadIdentity();
 
+    glPushMatrix();
+    glBegin(GL_LINES);
 
-    //cout<<"Rendering Lines";
+    glColor3f(1.0f,0.0f,0.0f);
+    glVertex2f(0.0,0.0);
+    glVertex2f(649.0,0.0);
+
+    glColor3f(0.0f,1.0f,0.0f);
+    glVertex2f(0.0,0.0);
+    glVertex2f(0.0,299.0);
+
+    glEnd();
+    glPopMatrix();
+
+
     glBegin(GL_LINES);
 
     float norm_vec_mag = 0.0;
     float vec_mag = 0.0;
-    float step = 1.0f;
 
     for(int y=0;y<248;y+=10){
         for(int x=0;x<600;x+=10){
-            //for vertex (x,y)
-            vec_mag = getVectorMagnitude(vec_data[x][y][z_counter][0],vec_data[x][y][z_counter][1],vec_data[x][y][z_counter][2]);
+
+            vec_mag = getVectorMagnitude(vector_data[x][y][z_key][0],vector_data[x][y][z_key][1],vector_data[x][y][z_key][2]);
             norm_vec_mag = (vec_mag-min_value)/(max_value-min_value);
-//                vec_length = sqrt(vec_data[x][y][0]*vec_data[x][y][0]+vec_data[x][y][1]*vec_data[x][y][1]);
-//                x_c = (vec_data[x][y][0])/vec_mag[x][y];
-//                y_c = (vec_data[x][y][1])/vec_mag[x][y];
+
 
             glColor3f(0.0f,0.2f,norm_vec_mag);
 
-//                glVertex2f(-0.9f+(x+x_c)*0.003,y*0.003);
-//                glVertex2f(-0.9f+(x+vec_data[x][y][0])*0.003,(y+vec_data[x][y][1])*0.003);
-//
-//                glVertex2f(-0.9f+(x+vec_data[x][y][0])*0.003,(y+vec_data[x][y][1])*0.003);
-//                glVertex2f(-0.9f+(x)*0.003,(y+y_c)*0.003);
-
-            glVertex2d(x*step, y*step);
-            glVertex2d((x+vec_data[x][y][z_counter][0])*step, (y+vec_data[x][y][z_counter][1])*step);
-//
-//                glVertex2d(-0.9f + (x+(vec_length/10)+0.5)*0.1, (y-(vec_length/10)+0.5)*0.1);
-//                glVertex2d(-0.9f + (x+(vec_length/10)+0.5)*0.1, (y+(vec_length/10)+0.5)*0.1);
-//
-//                glVertex2d(-0.9f + (x+(vec_length/10)+0.5)*0.1, (y+(vec_length/10)+0.5)*0.1);
-//                glVertex2d(-0.9f + (x-(vec_length/10)+0.5)*0.1, (y+(vec_length/10)+0.5)*0.1);
-//
-//                glVertex2d(-0.9f + (x-(vec_length/10)+0.5)*0.1, (y+(vec_length/10)+0.5)*0.1);
-//                glVertex2d(-0.9f + (x+(vec_length/10)+0.5)*0.1, (y-(vec_length/10)+0.5)*0.1);
-
+            glVertex2d(x, y);
+            glVertex2d((x+vector_data[x][y][z_key][0]), (y+vector_data[x][y][z_key][1]));
 
         }
     }
 
-//        vec_length = sqrt(0.5f);
-//        for(int x = 0; x<6; x++ ){
-//            for(int y=0; y<3; y++){
-//
-//                glColor3f(0.0f, 0.5f, 0.5f);
-//
-//
-//                glVertex2d(-0.9f + x*0.1, y*0.1);
-//                glVertex2d(-0.9f + (x+0.5)*0.1, (y+0.5)*0.1);
-//
-//                glVertex2d(-0.9f + (x+(vec_length/10)+0.5)*0.1, (y-(vec_length/10)+0.5)*0.1);
-//                glVertex2d(-0.9f + (x+(vec_length/10)+0.5)*0.1, (y+(vec_length/10)+0.5)*0.1);
-//
-//                glVertex2d(-0.9f + (x+(vec_length/10)+0.5)*0.1, (y+(vec_length/10)+0.5)*0.1);
-//                glVertex2d(-0.9f + (x-(vec_length/10)+0.5)*0.1, (y+(vec_length/10)+0.5)*0.1);
-//
-//                glVertex2d(-0.9f + (x-(vec_length/10)+0.5)*0.1, (y+(vec_length/10)+0.5)*0.1);
-//                glVertex2d(-0.9f + (x+(vec_length/10)+0.5)*0.1, (y-(vec_length/10)+0.5)*0.1);
-//
-//
-//            }
-//        }
-//
-    z_counter++;
+    glEnd();
+
+    glBegin(GL_QUADS);
+        glColor3f(0.0f,0.2f,0.0f);
+        glVertex2f(150.0,-120.0);
+        glColor3f(0.0f,0.2f,0.0f);
+        glVertex2f(150.0,-150.0);
+        glColor3f(0.0f,0.2f,1.0f);
+        glVertex2f(450.0,-150.0);
+        glColor3f(0.0f,0.2f,1.0f);
+        glVertex2f(450.0,-120.0);
     glEnd();
     glutSwapBuffers();
 
 }
 void renderStreamLines(){
 
-
-
-
-    //extractVectorbyZ(z_counter++);
-    cout<<"\t z = "<<z_counter++;
-
-    if(z_counter>=247){
-        z_counter=0;
-
-    }
-
     glClear(GL_COLOR_BUFFER_BIT| GL_DEPTH_BUFFER_BIT);
-
     glLoadIdentity();
 
+    glPushMatrix();
+    glBegin(GL_LINES);
+
+    glColor3f(1.0f,0.0f,0.0f);
+    glVertex2f(0.0,0.0);
+    glVertex2f(649.0,0.0);
+
+    glColor3f(0.0f,1.0f,0.0f);
+    glVertex2f(0.0,0.0);
+    glVertex2f(0.0,299.0);
+
+    glEnd();
+    glPopMatrix();
     float h = 0.5;
     int num_iter = 0;
 
-    glBegin(GL_LINES);
-
-    glColor3f(1.0,0.0,0.0);
-    glVertex2f(0.0,0.0);
-    glVertex2f(600.0,0.0);
-
-    glColor3f(0.0,1.0,0.0);
-    glVertex2f(0.0,0.0);
-    glVertex2f(0.0,248.0);
-
-
-    glEnd();
-
-
-//    seedPoints[0].velocity[0] = vec_data[300][124][0][0];
-//    seedPoints[0].velocity[1] = vec_data[300][124][0][1];
-//    seedPoints[0].velocity[2] = vec_data[300][124][0][2];
-//    //set seedPoints : Make this a function instead
-
     Vec_GridPoint final_pt, initial_pt;
 
-
-
+    glBegin(GL_LINE_STRIP);
+    glColor3f(0.0f,0.0f,0.5f);
     cout<<"Prinitng stream Lines"<<endl;
 
-   // cout<<"(350,124) ("<< vec_data[int(seedPoints[0].coord_x)][int(seedPoints[0].coord_y)][int(seedPoints[0].coord_z)][0]<<","<<vec_data[350][124][0][1]<<endl;
+    cout<<"(350,124) ("<< vector_data[int(seedPoints[0].coord_x)][int(seedPoints[0].coord_y)][int(seedPoints[0].coord_z)][0]<<","<<vector_data[350][124][0][1]<<endl;
 
-    for(int i=0; i<10 ; i++){
-        //cout<<"In i = "<< i << " loop"<<endl;
+ for(int i=0; i<10 ; i++){
+
         initial_pt = seedPoints[i];
-        initial_pt.coord_z = (z_counter-1);
+        initial_pt.coord_z = z_key;
         glBegin(GL_POINT);
             glPointSize(500.0);
             glColor3f(1.0,0.0,0.0);
@@ -784,338 +954,157 @@ void renderStreamLines(){
         while(num_iter < MAX_NUM_ITER && (final_pt.coord_x!=seedPoints[i].coord_x && final_pt.coord_y!=seedPoints[i].coord_y)
               && final_pt.coord_x < 599 && final_pt.coord_x > 0 && final_pt.coord_y < 247 && final_pt.coord_y > 0){
 
-                //final_pt = RK4(initial_pt, h);
-                final_pt = EulersLI(initial_pt);
-
+              if(integration_fn==0){
+                    final_pt = EulersLI(initial_pt);
+                }else{
+                    final_pt = RK4(initial_pt, h);
+                }
 
                 glVertex2d(initial_pt.coord_x, initial_pt.coord_y);
                 glVertex2d(final_pt.coord_x, final_pt.coord_y);
-                //cout<<"Line Point1: ("<< initial_pt.coord_x <<","<<initial_pt.coord_y<<")"<<endl;
-                //cout<<"Line Point2: ("<< final_pt.coord_x <<","<<final_pt.coord_y<<")"<<endl;
+//                cout<<"Line Point1: ("<< initial_pt.coord_x <<","<<initial_pt.coord_y<<")"<<endl;
+//                cout<<"Line Point2: ("<< final_pt.coord_x <<","<<final_pt.coord_y<<")"<<endl;
                 initial_pt = final_pt;
 
                 num_iter++;
 
         }
 
-            glEnd();
-
 
     }
 
 
-
+    glEnd();
 
     glutSwapBuffers();
 
 
 }
-int extractScalarbyZ(int scalar_index, int z_value){
 
-    int result = 0;
-    float scalar[10];
-    ifstream fin(input_file_name.c_str());
-
-    if(!fin){
-        cout<<"Could not open " << input_file_name << " for reading";
-        return -2;
-    }
-
-    if(scalar_index<0 || scalar_index>9){
-        cout<<"Invalid scalar_index for multifield file. Valid Values :  0<= scalar_index <=9 .";
-        return -1;
-    }
-
-    if(z_value<0 || z_value>247){
-        cout<<"Invalid z_value. Valid Values :  0<= z_value <=247 .";
-    }
-
-    for(int z=0;z<248;z++){
-        for(int y=0;y<248;y++){
-            for(int x=0;x<600;x++){
-                fin >> scalar[0] >> scalar[1] >>scalar[2] >>scalar[3] >>scalar[4] >>scalar[5] >>scalar[6] >>scalar[7] >>scalar[8] >>scalar[9];
-                if(z==z_value){
-                    if(x==0 && y==0 ){
-                        max_value = scalar[scalar_index];
-                        min_value = scalar[scalar_index];
-                    }
-                    if(scalar[scalar_index] > max_value ){
-                        max_value = scalar[scalar_index];
-                    }
-                    if(scalar[scalar_index] < min_value ){
-                        min_value = scalar[scalar_index];
-                    }
-                    data_array2D[x][y]=scalar[scalar_index];
-                }
-            }
-        }
-        if(z==z_value)break;
-    }
-
-    result = 1;
-    fin.close();
-
-return result;
-}
-int extractMagOfCurl(){
-
-    int result = 0;
-    ifstream fin(input_file_name.c_str());
-    if(!fin){
-        cout<<"Could not open " << input_file_name << " for reading";
-        return -2;
-    }else{
-        cout<<"Able to Open file: "<< input_file_name.c_str();
-    }
-
-
-    float r0,r1,r2;
-    unsigned x,y,z;
-    cout<<"reading file"<<endl;
-    for(z=0;z<248;z++){
-        for(y=0;y<248;y++){
-            for(x=0;x<600;x++){
-                fin >> r0 >> r1 >> r2;
-                 vel[x][y][z][0]=r0;
-                 vel[x][y][z][1]=r1;
-                 vel[x][y][z][2]=r2;
-            }
-        }
-
-    }
-    fin.close();
-
-    cout<<"Calculating curl"<<endl;
-    for(z=0;z<248;z++){
-    for(y=0;y<248;y++){
-        for(x=0;x<600;x++){
-            if((x==599) || (y==247)||(z==247)){
-                curl_mag[x][y][z]=0.0;
-            }else{
-                VECTOR curl;
-                curl[0] = (vel[x][y+1][z][2]-vel[x][y][z][2]-vel[x][y][z+1][1]+vel[x][y][z][1])/0.001;
-                curl[1] = (vel[x][y][z+1][0]-vel[x][y][z][0]-vel[x+1][y][z][2]+vel[x][y][z][2])/0.001;
-                curl[2] = (vel[x+1][y][z][1]-vel[x][y][z][1]-vel[x][y+1][z][0]+vel[x][y][z][0])/0.001;
-                curl_mag[x][y][z]= sqrt(curl[0]*curl[0]+curl[1]*curl[1]+curl[2]*curl[2]);
-            }
-
-        }
-    }
-    }
-
-    cout<<"Compeleted calculating Curl";
-    result = 1;
-
-    return result;
-
-}
-int subsetCurlMag(int z_value){
-
-    for(int z=0;z<248;z++){
-        for(int y=0;y<248;y++){
-            for(int x=0;x<600;x++){
-                if(z==z_value){
-                    if(x==0 && y==0 ){
-                        max_value = curl_mag[x][y][z];
-                        min_value = curl_mag[x][y][z];
-                    }
-                    if(curl_mag[x][y][z] > max_value ){
-                        max_value = curl_mag[x][y][z];
-                    }
-                    if(curl_mag[x][y][z] < min_value ){
-                        min_value = curl_mag[x][y][z];
-                    }
-                    data_array2D[x][y]=curl_mag[x][y][z];
-                }
-            }
-        }
-        if(z==z_value)break;
-    }
-
-    return 1;
-
-}
-int normalize_data(float min_val, float max_val){
-
-    int result = 0;
-
-    for(int x=0;x<600;x++){
-        for(int y=0;y<248;y++){
-            norm_data_array2D[x][y] = (data_array2D[x][y] - min_val)/(max_value-min_val);
-        }
-    }
-
-    return result;
-}
 void reshape(int w, int h){
 
     glViewport(0,0,w,h);
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
     //glOrtho(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0);
-    glOrtho(-700.0, 700.0, -300.0, 300.0, -300.0, 300.0);
+    glOrtho(-300.0, 700.0, -300.0, 700.0, -700.0, 700.0);
     glMatrixMode(GL_MODELVIEW);
 
 }
 void initOpenGL(){
 
     glClearColor( 1.0f, 1.0f, 1.0f, 1.0f );
-    glEnable(GL_DEPTH_TEST|GL_PROGRAM_POINT_SIZE_EXT);
+    glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LEQUAL);
 
+}
+
+//switching will happen based on the menu value selected
+void displaySwitch(){
+
+
+  if(menu_value<=8){
+
+    int switch_val = menu_value/3;
+    scalar_index=menu_value%3;
+    switch (switch_val){
+
+        case 0: renderColorMap();
+                break;
+        case 1: renderHeightMap();
+                break;
+        case 2: renderContourMap();
+                break;
+    }
+
+  } else if(menu_value>8 && menu_value<=11) {
+
+
+
+        switch (menu_value){
+
+        case 9:     renderHedgeHog();
+                    break;
+        case 10:    integration_fn = 0;
+                    renderStreamLines();
+                    break;
+        case 11:    integration_fn = 1;
+                    renderStreamLines();
+                    break;
+
+        }
+
+  }
 
 }
+/* executed when program is idle */
+void idle() {
+
+}
+/* executed when button 'button' is put into state 'state' at screen position ('x', 'y') */
+void mouseClick(int button, int state, int x, int y) {
+
+}
+
+/* executed when the mouse moves to position ('x', 'y') */
+void mouseMotion(int x, int y) {
+
+}
+
 int main(int argc, char **argv){
 
-    input_file_name = argv[1];
-    //input_file_name = "../velocity.0100.txt";
+    scalar_file_name = argv[1];
+    vector_file_name = argv[2];
 
-    string scalarName = argv[2];
-    //string scalarName = "velocity";
-
-    int scalar_index=0;
-
-    if(scalarName=="density"){
-        scalar_index=0;
-    }
-    if(scalarName=="temperature"){
-        scalar_index=1;
-    }
-    if(scalarName=="curl"){
-        scalar_index=10;
-    }
-    if(scalarName=="velocity"){
-        scalar_index = 15;
+    if(argc>3){
+        z_test = stoi(argv[3]);
+        cout<<"z_test "<<z_test<<endl;
     }
 
-    string map_type = argv[3];
-    //string map_type = "streamlines";
+    int scalar_extract = extractScalarData();
+    if(scalar_extract==0){
+        cout<<endl<<"Could not extract Scalar Data"<<endl;
+        return -1;
+    }
 
-    cout<<endl<<input_file_name<<" " << scalarName<< " " << map_type <<endl;
-    int extract_done =0;
+    int vector_extract = extractVectorData();
+    if(vector_extract==0){
+        cout<<endl<<"Could not extract Vector Data"<<endl;
+        return -1;
+    }
+
+    int norm_data_done = normalize_scalar_data();
+
+    if(scalar_extract!=0 && vector_extract !=0 && norm_data_done !=0){
 
 
+    cout<<"Setting 10 SeedPoints for Vector Viz"<<endl;
+
+    for(int j=0;j<10;j++){
+            seedPoints[j].coord_x = float(rand()%598);
+            seedPoints[j].coord_y = float(rand()%246);
+            seedPoints[j].coord_z = 0.0;
+            cout<<"SeedPoint "<< j<<" ("<< seedPoints[j].coord_x <<","<< seedPoints[j].coord_y<<")"<<endl;
+    }
 
     glutInit(&argc,argv);
     glutInitDisplayMode(GLUT_DOUBLE|GLUT_RGBA|GLUT_DEPTH);
     glutInitWindowSize(500,500);
     glutInitWindowPosition(100,100);
-    glutCreateWindow("Assignment 1");
+    window=glutCreateWindow("PH2017001_A1");
+
+    glutSpecialFunc(processSpecialKeys);
+
+    glutIdleFunc(idle);
+    glutIgnoreKeyRepeat(true); // ignore keys held down
+
+    createMenu();
+
+
     initOpenGL();
-
-    switch(scalar_index){
-
-    case 0: extract_done = extractScalarbyZ(scalar_index,0);
-            cout<<"Extract Completed. Normalization started"<<endl;
-            normalize_data(min_value, max_value);
-            cout<<"Normalization complete"<<endl;
-
-            if(extract_done==1){
-                normalize_data(min_value, max_value);
-                if(map_type=="colormap"){
-                    cout<<"\nGenerating ColorMap for Density"<<endl;
-                    glutDisplayFunc(renderColorMap);
-                    glutIdleFunc(renderColorMap);
-                }
-                if(map_type=="heightmap"){
-                    glutDisplayFunc(renderHeightMap);
-                    glutIdleFunc(renderHeightMap);
-                }
-                if(map_type=="contourmap"){
-                    glutDisplayFunc(renderContourMap);
-                    glutIdleFunc(renderContourMap);
-                }
-            }else{
-                cout<<"Unable to extract data";
-            }
-            break;
-
-    case 1: extract_done = extractScalarbyZ(scalar_index,0);
-            cout<<"Extract Completed. Normalization started"<<endl;
-            normalize_data(min_value, max_value);
-            cout<<"Normalization complete"<<endl;
-            if(extract_done==1){
-                if(map_type=="colormap"){
-                    cout<<"\nGenerating ColorMap for Temperature"<<endl;
-                    glutDisplayFunc(renderColorMap);
-                    glutIdleFunc(renderColorMap);
-                }
-                if(map_type=="heightmap"){
-                    glutDisplayFunc(renderHeightMap);
-                    glutIdleFunc(renderHeightMap);
-                }
-                if(map_type=="contourmap"){
-                    glutDisplayFunc(renderContourMap);
-                    glutIdleFunc(renderContourMap);
-                }
-            }else{
-                cout<<"Unable to extract data";
-            }
-            break;
-
-    case 10:if(extractMagOfCurl()==1){
-                extract_done = subsetCurlMag(0);
-                normalize_data(min_value, max_value);
-            }
-
-            if(extract_done==1){
-                if(map_type=="colormap"){
-                    cout<<"\nGenerating ColorMap for Curl magnitude"<<endl;
-                    glutDisplayFunc(renderColorMap);
-                    glutIdleFunc(renderColorMap);
-                }
-                if(map_type=="heightmap"){
-                    glutDisplayFunc(renderHeightMap);
-                    glutIdleFunc(renderHeightMap);
-                }
-                if(map_type=="contourmap"){
-                    glutDisplayFunc(renderContourMap);
-                    glutIdleFunc(renderContourMap);
-                }
-            }else{
-                cout<<"Unable to extract data";
-            }
-            break;
-
-    case 15:
-            extract_done = extractVectorData();
-
-            cout<<"Extract Done = "<< extract_done<<endl<<"Min_value "<< min_value <<endl<<"Max_value "<< max_value;
-
-            if(extract_done==1){
-                if(map_type=="hedgehog"){
-                    cout<<"\nGenerating Hedgehog for Velocity"<<endl;
-                    glutDisplayFunc(renderHedgeHog);
-                    glutIdleFunc(renderHedgeHog);
-                }
-                if(map_type=="streamlines"){
-                    for(int j=0;j<10;j++){
-
-                        seedPoints[j].coord_x = float(rand()%598);
-                        seedPoints[j].coord_y = float(rand()%246);
-                        seedPoints[j].coord_z = 0.0;
-                        cout<<"SeedPoint "<< j<<" ("<< seedPoints[j].coord_x <<","<< seedPoints[j].coord_y<<")"<<endl;
-
-                    }
-                    glutDisplayFunc(renderStreamLines);
-                    glutIdleFunc(renderStreamLines);
-                    renderStreamLines();
-                }
-            }else{
-                cout<<"Unable to extract data";
-            }
-            break;
-
-    default:    cout<<"Invalid MapType or Scalar/Vector Field Name."<<endl;
-                cout<<"Valid Scalar Fields are:   density,    pressure    & curl"<<endl;
-                cout<<"Valid Scalar field Maps are:  colormap,   heightmap   & contourmap"<<endl;
-                cout<<"Valid Vector Fields are:   velocity"<<endl;
-                cout<<"Valid Vector Fields MapType are:        hedgehog    & streamlines"<<endl;
-                break;
-    }
-
-
+    glutDisplayFunc(displaySwitch);
     glutReshapeFunc(reshape);
     glutMainLoop();
+    }
     return 0;
 }
